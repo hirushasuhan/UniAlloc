@@ -2,7 +2,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { HiOutlinePlus, HiOutlineXMark, HiOutlineChevronDown, HiOutlineChevronUp } from 'react-icons/hi2'
 
 export default function AdminFacultiesPage() {
   const [faculties, setFaculties] = useState<any[]>([])
@@ -55,13 +55,13 @@ export default function AdminFacultiesPage() {
 
   return (
     <DashboardLayout requiredRole="system_admin">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">Faculties & Departments</h1>
           <p className="text-[var(--muted)] text-sm mt-1">{faculties.length} faculties · {depts.length} departments</p>
         </div>
         <button onClick={() => setShowModal(true)} className="btn-primary">
-          <Plus size={16}/> Add Faculty
+          <HiOutlinePlus size={16}/> Add Faculty
         </button>
       </div>
 
@@ -87,9 +87,9 @@ export default function AdminFacultiesPage() {
                 <div className="flex items-center gap-3">
                   <button onClick={e => { e.stopPropagation(); setDeptModal(f.id) }}
                     className="btn-secondary text-xs py-1.5 px-3" title="Add department">
-                    <Plus size={13}/> Add Dept
+                    <HiOutlinePlus size={13}/> Add Dept
                   </button>
-                  {open ? <ChevronUp size={18} className="text-[var(--muted)]"/> : <ChevronDown size={18} className="text-[var(--muted)]"/>}
+                  {open ? <HiOutlineChevronUp size={18} className="text-[var(--muted)]"/> : <HiOutlineChevronDown size={18} className="text-[var(--muted)]"/>}
                 </div>
               </div>
               {open && facDepts.length > 0 && (
@@ -120,7 +120,7 @@ export default function AdminFacultiesPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="glass-card w-full max-w-md p-6 relative">
-            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-[var(--muted)]"><X size={18}/></button>
+            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-[var(--muted)]"><HiOutlineXMark size={18}/></button>
             <h2 className="font-heading font-semibold text-lg mb-5">Create Faculty</h2>
             <form onSubmit={createFaculty} className="space-y-4">
               <div>
@@ -144,7 +144,7 @@ export default function AdminFacultiesPage() {
       {deptModal !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="glass-card w-full max-w-md p-6 relative">
-            <button onClick={() => setDeptModal(null)} className="absolute top-4 right-4 text-[var(--muted)]"><X size={18}/></button>
+            <button onClick={() => setDeptModal(null)} className="absolute top-4 right-4 text-[var(--muted)]"><HiOutlineXMark size={18}/></button>
             <h2 className="font-heading font-semibold text-lg mb-1">Add Department</h2>
             <p className="text-sm text-[var(--muted)] mb-5">
               Faculty: <strong>{faculties.find(f=>f.id===deptModal)?.faculty_name}</strong>

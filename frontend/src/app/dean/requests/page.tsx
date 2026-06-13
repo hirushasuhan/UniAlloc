@@ -3,7 +3,7 @@ import { useEffect, useState, FormEvent } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import { getUser } from '@/lib/auth'
-import { CheckCircle, XCircle, Plus, X } from 'lucide-react'
+import { HiOutlineCheckCircle, HiOutlineXCircle, HiOutlinePlus, HiOutlineXMark } from 'react-icons/hi2'
 
 const STEP_LABEL: Record<string, string> = {
   pending_dean:      'Awaiting Your Approval',
@@ -100,7 +100,7 @@ export default function DeanRequestsPage() {
 
   return (
     <DashboardLayout requiredRole="dean">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">Work Requests</h1>
           <p className="text-[var(--muted)] text-sm mt-1">
@@ -108,7 +108,7 @@ export default function DeanRequestsPage() {
           </p>
         </div>
         <button onClick={() => setShowModal(true)} className="btn-primary">
-          <Plus size={16} /> New Request
+          <HiOutlinePlus size={16} /> New Request
         </button>
       </div>
 
@@ -148,11 +148,11 @@ export default function DeanRequestsPage() {
                 <div className="flex gap-2 flex-shrink-0">
                   <button onClick={() => act(r.id, 'approve')}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 text-green-700 hover:bg-green-500/20 text-sm font-medium">
-                    <CheckCircle size={14} /> Approve
+                    <HiOutlineCheckCircle size={14} /> Approve
                   </button>
                   <button onClick={() => act(r.id, 'reject')}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-700 hover:bg-red-500/20 text-sm font-medium">
-                    <XCircle size={14} /> Reject
+                    <HiOutlineXCircle size={14} /> Reject
                   </button>
                 </div>
               </div>
@@ -192,11 +192,11 @@ export default function DeanRequestsPage() {
                 <div className="flex gap-2 flex-shrink-0">
                   <button onClick={() => act(r.id, 'accept')}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 text-green-700 hover:bg-green-500/20 text-sm font-medium">
-                    <CheckCircle size={14} /> Accept
+                    <HiOutlineCheckCircle size={14} /> Accept
                   </button>
                   <button onClick={() => act(r.id, 'reject')}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-700 hover:bg-red-500/20 text-sm font-medium">
-                    <XCircle size={14} /> Reject
+                    <HiOutlineXCircle size={14} /> Reject
                   </button>
                 </div>
               </div>
@@ -250,7 +250,7 @@ export default function DeanRequestsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="glass-card w-full max-w-md p-6 relative">
             <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-[var(--muted)]">
-              <X size={18} />
+              <HiOutlineXMark size={18} />
             </button>
             <h2 className="font-heading font-semibold text-lg mb-5">Submit Work Request</h2>
             <form onSubmit={submit} className="space-y-4">

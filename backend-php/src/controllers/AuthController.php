@@ -83,4 +83,101 @@ class AuthController
         // JWT is stateless — client discards the token
         Response::success(null, 'Logged out');
     }
+
+    public function register(array $params = []): void
+    {
+        $body  = json_decode(file_get_contents('php://input'), true) ?? [];
+        $fullName = trim($body['full_name'] ?? '');
+        $email    = trim($body['email'] ?? '');
+        $pass     = $body['password'] ?? '';
+        $deptId   = $body['department_id'] ?? null;
+        $enrollNo = trim($body['enrollment_number'] ?? '');
+
+        if (!$fullName || !$email || !$pass || !$deptId || !$enrollNo) {
+            Response::error('All fields (Full Name, Email, Password, Department, Enrollment Number) are required', 422);
+        }
+
+        $db = Db::connection();
+
+        // Check if email or enrollment number exists
+        $stmt = $db->prepare('SELECT email, enrollment_number FROM users WHERE email = :email OR enrollment_number = :enroll LIMIT 1');
+        $stmt->execute([':email' => $email, ':enroll' => $enrollNo]);
+        $existing = $stmt->fetch();
+        
+        if ($existing) {
+            if ($existing['email'] === $email) {
+                Response::error('Email is already registered', 409);
+            }
+            if ($existing['enrollment_number'] === $enrollNo) {
+                Response::error('Enrollment number is already registered', 409);
+            }
+        }
+
+        $hash = password_hash($pass, PASSWORD_BCRYPT, ['cost' => 12]);
+
+        try {
+            $db->beginTransaction();
+
+            $insertStmt = $db->prepare(
+                'INSERT INTO users (full_name, email, password_hash, role_id, department_id, enrollment_number, capacity_hours)
+                 VALUES (:fname, :email, :hash, 5, :dept, :enroll, 0.00)' // role_id 5 = student
+            );
+            $insertStmt->execute([
+                ':fname'  => $fullName,
+                ':email'  => $email,
+                ':hash'   => $hash,
+                ':dept'   => $deptId,
+                ':enroll' => $enrollNo
+            ]);
+            $userId = (int)$db->lastInsertId();
+
+            AuditLogDao::log($userId, 'register', 'users', $userId);
+
+            $db->commit();
+
+            // Auto-login logic
+            $stmt = $db->prepare(
+                'SELECT u.id, u.full_name, u.email, u.department_id, u.enrollment_number,
+                        r.role_name, d.faculty_id
+                 FROM users u
+                 JOIN roles r ON r.id = u.role_id
+                 LEFT JOIN departments d ON d.id = u.department_id
+                 WHERE u.id = :id
+                 LIMIT 1'
+            );
+            $stmt->execute([':id' => $userId]);
+            $user = $stmt->fetch();
+
+            $facultyId = $user['faculty_id'] ? (int)$user['faculty_id'] : null;
+
+            $payload = [
+                'sub'     => (int)$user['id'],
+                'name'    => $user['full_name'],
+                'email'   => $user['email'],
+                'role'    => $user['role_name'],
+                'dept'    => $user['department_id'] ? (int)$user['department_id'] : null,
+                'faculty' => $facultyId,
+            ];
+
+            $token = JwtHelper::generate($payload);
+
+            Response::success([
+                'token' => $token,
+                'user'  => [
+                    'id'                => (int)$user['id'],
+                    'full_name'         => $user['full_name'],
+                    'email'             => $user['email'],
+                    'role'              => $user['role_name'],
+                    'dept_id'           => $user['department_id'] ? (int)$user['department_id'] : null,
+                    'faculty_id'        => $facultyId,
+                    'enrollment_number' => $user['enrollment_number'] ?? null,
+                    'contact'           => null,
+                ],
+            ], 'Registration successful');
+
+        } catch (\Exception $e) {
+            $db->rollBack();
+            Response::error('Failed to register user: ' . $e->getMessage(), 500);
+        }
+    }
 }

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { Bell, CheckCheck, RefreshCw } from 'lucide-react'
+import { HiOutlineBell, HiOutlineCheckBadge, HiOutlineArrowPath } from 'react-icons/hi2'
 
 const TYPE_COLOR: Record<string,string> = {
   assignment: 'bg-indigo-100 text-indigo-700',
@@ -38,10 +38,10 @@ export default function NotificationsPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white">
-            <Bell size={20}/>
+            <HiOutlineBell size={20}/>
           </div>
           <div>
             <h1 className="text-2xl font-heading font-bold">Notifications</h1>
@@ -51,11 +51,11 @@ export default function NotificationsPage() {
         <div className="flex gap-2">
           {unread > 0 && (
             <button onClick={markAllRead} className="btn-secondary text-sm">
-              <CheckCheck size={15}/> Mark all read
+              <HiOutlineCheckBadge size={15}/> Mark all read
             </button>
           )}
           <button onClick={load} disabled={loading} className="btn-secondary text-sm">
-            <RefreshCw size={15} className={loading?'animate-spin':''}/> Refresh
+            <HiOutlineArrowPath size={15} className={loading?'animate-spin':''}/> Refresh
           </button>
         </div>
       </div>
@@ -84,7 +84,7 @@ export default function NotificationsPage() {
         ))}
         {notifs.length === 0 && (
           <div className="glass-card p-10 text-center">
-            <Bell size={32} className="mx-auto text-[var(--muted)] mb-3 opacity-40"/>
+            <HiOutlineBell size={32} className="mx-auto text-[var(--muted)] mb-3 opacity-40"/>
             <p className="text-[var(--muted)]">No notifications yet.</p>
           </div>
         )}

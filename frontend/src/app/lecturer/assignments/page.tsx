@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { X } from 'lucide-react'
+import { HiOutlineXMark } from 'react-icons/hi2'
 
 const PRIORITY_COLOR: Record<string,string> = {
   urgent:'bg-red-100 text-red-700', high:'bg-orange-100 text-orange-700',

@@ -2,7 +2,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { Save } from 'lucide-react'
+import { HiOutlineDocumentCheck } from 'react-icons/hi2'
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<Record<string,string>>({})
@@ -62,7 +62,7 @@ export default function AdminSettingsPage() {
             </div>
           ))}
           <button type="submit" disabled={saving} className="btn-primary">
-            <Save size={16}/>{saving ? 'Saving…' : 'Save Settings'}
+            <HiOutlineDocumentCheck size={16}/>{saving ? 'Saving…' : 'Save Settings'}
           </button>
         </form>
       </div>

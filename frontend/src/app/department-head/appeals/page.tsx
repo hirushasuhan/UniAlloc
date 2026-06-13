@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { X } from 'lucide-react'
+import { HiOutlineXMark } from 'react-icons/hi2'
 
 export default function DeptHeadAppealsPage() {
   const [appeals,  setAppeals]  = useState<any[]>([])
@@ -70,7 +70,7 @@ export default function DeptHeadAppealsPage() {
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="glass-card w-full max-w-md p-6 relative">
-            <button onClick={() => setSelected(null)} className="absolute top-4 right-4 text-[var(--muted)]"><X size={18}/></button>
+            <button onClick={() => setSelected(null)} className="absolute top-4 right-4 text-[var(--muted)]"><HiOutlineXMark size={18}/></button>
             <h2 className="font-heading font-semibold text-lg mb-1">Review Appeal</h2>
             <p className="text-sm text-[var(--muted)] mb-3">From: <strong>{selected.lecturer_name}</strong></p>
             <div className="bg-[var(--bg)] rounded-xl p-3 mb-4 text-sm">{selected.reason}</div>

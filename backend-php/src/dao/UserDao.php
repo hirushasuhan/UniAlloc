@@ -66,6 +66,15 @@ class UserDao
         return $row ?: null;
     }
 
+    public static function findWithPassword(int $id): ?array
+    {
+        $db = Db::connection();
+        $stmt = $db->prepare('SELECT id, password_hash FROM users WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
     public static function create(array $data): int
     {
         $db   = Db::connection();

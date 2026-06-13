@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { Users, BookOpen, BarChart2, FileText } from 'lucide-react'
+import { HiOutlineUsers, HiOutlineBookOpen, HiOutlineChartBar, HiOutlineDocumentText } from 'react-icons/hi2'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ users: 0, faculties: 0, departments: 0, assignments: 0 })
@@ -27,10 +27,10 @@ export default function AdminDashboard() {
   }, [])
 
   const kpis = [
-    { label: 'Total Users',       value: stats.users,       icon: <Users size={20}/>,   color: 'from-blue-500 to-indigo-600' },
-    { label: 'Faculties',         value: stats.faculties,   icon: <BookOpen size={20}/>, color: 'from-violet-500 to-purple-600' },
-    { label: 'Departments',       value: stats.departments, icon: <BarChart2 size={20}/>, color: 'from-emerald-500 to-teal-600' },
-    { label: 'Active Assignments',value: stats.assignments, icon: <FileText size={20}/>,  color: 'from-orange-500 to-amber-600' },
+    { label: 'Total Users',       value: stats.users,       icon: <HiOutlineUsers size={20}/>,   color: 'from-blue-500 to-indigo-600' },
+    { label: 'Faculties',         value: stats.faculties,   icon: <HiOutlineBookOpen size={20}/>, color: 'from-violet-500 to-purple-600' },
+    { label: 'Departments',       value: stats.departments, icon: <HiOutlineChartBar size={20}/>, color: 'from-emerald-500 to-teal-600' },
+    { label: 'Active Assignments',value: stats.assignments, icon: <HiOutlineDocumentText size={20}/>,  color: 'from-orange-500 to-amber-600' },
   ]
 
   return (

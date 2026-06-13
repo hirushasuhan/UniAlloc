@@ -2,7 +2,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { Plus, Search, UserCheck, UserX, X } from 'lucide-react'
+import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineUserPlus, HiOutlineUserMinus, HiOutlineXMark, HiOutlineKey } from 'react-icons/hi2'
 
 const ROLES = ['system_admin','dean','department_head','lecturer','student']
 
@@ -74,6 +74,16 @@ export default function AdminUsersPage() {
     load()
   }
 
+  async function resetPassword(id: number) {
+    if (!confirm('Are you sure you want to reset this user\'s password?')) return;
+    try {
+      const res = await api.post(`/users/${id}/reset-password`, {})
+      alert(`Success! The new password for this user is: ${res.data.data.new_password}`)
+    } catch(err:any) {
+      alert(err.response?.data?.message ?? 'Failed to reset password.')
+    }
+  }
+
   const roleColor: Record<string,string> = {
     system_admin:'bg-purple-100 text-purple-700',
     dean:'bg-indigo-100 text-indigo-700',
@@ -85,13 +95,13 @@ export default function AdminUsersPage() {
 
   return (
     <DashboardLayout requiredRole="system_admin">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">User Management</h1>
           <p className="text-[var(--muted)] text-sm mt-1">{users.length} total users</p>
         </div>
         <button onClick={() => setShowModal(true)} className="btn-primary">
-          <Plus size={16}/> Add User
+          <HiOutlinePlus size={16}/> Add User
         </button>
       </div>
 
@@ -102,9 +112,9 @@ export default function AdminUsersPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-3 mb-5">
+      <div className="flex flex-wrap gap-3 mb-5">
         <div className="relative flex-1 max-w-xs">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
+          <HiOutlineMagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
           <input value={search} onChange={e=>setSearch(e.target.value)}
             className="input pl-9" placeholder="Search by name or email…"/>
         </div>
@@ -145,11 +155,15 @@ export default function AdminUsersPage() {
                     {u.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td className="py-3 px-4">
+                <td className="py-3 px-4 flex gap-2">
+                  <button onClick={() => resetPassword(u.id)} title="Reset Password"
+                    className="inline-flex items-center justify-center w-7 h-7 bg-white/5 hover:bg-cyan-500/20 text-cyan-500 rounded-md transition-colors border border-white/5 hover:border-cyan-500/30">
+                    <HiOutlineKey size={14} />
+                  </button>
                   <button onClick={() => toggleActive(u.id, u.is_active)}
                     className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg transition-colors
                       ${u.is_active ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
-                    {u.is_active ? <><UserX size={13}/> Deactivate</> : <><UserCheck size={13}/> Activate</>}
+                    {u.is_active ? <><HiOutlineUserMinus size={13}/> Deactivate</> : <><HiOutlineUserPlus size={13}/> Activate</>}
                   </button>
                 </td>
               </tr>
@@ -166,7 +180,7 @@ export default function AdminUsersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="glass-card w-full max-w-md p-6 relative">
             <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-[var(--muted)] hover:text-[var(--text)]">
-              <X size={18}/>
+              <HiOutlineXMark size={18}/>
             </button>
             <h2 className="font-heading font-semibold text-lg mb-5">Create New User</h2>
             <form onSubmit={handleCreate} className="space-y-4">

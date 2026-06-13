@@ -2,7 +2,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { Plus, X } from 'lucide-react'
+import { HiOutlinePlus, HiOutlineXMark } from 'react-icons/hi2'
 
 export default function LecturerAppealsPage() {
   const [appeals,   setAppeals]   = useState<any[]>([])
@@ -34,12 +34,12 @@ export default function LecturerAppealsPage() {
 
   return (
     <DashboardLayout requiredRole="lecturer">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">Workload Appeals</h1>
           <p className="text-[var(--muted)] text-sm mt-1">Request a workload reduction formally</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary"><Plus size={16}/> New Appeal</button>
+        <button onClick={() => setShowModal(true)} className="btn-primary"><HiOutlinePlus size={16}/> New Appeal</button>
       </div>
 
       {msg && (
@@ -75,7 +75,7 @@ export default function LecturerAppealsPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="glass-card w-full max-w-md p-6 relative">
-            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-[var(--muted)]"><X size={18}/></button>
+            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-[var(--muted)]"><HiOutlineXMark size={18}/></button>
             <h2 className="font-heading font-semibold text-lg mb-5">Submit Workload Appeal</h2>
             <form onSubmit={submit} className="space-y-4">
               <div>

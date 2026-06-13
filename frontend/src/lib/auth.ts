@@ -10,7 +10,7 @@ export interface AuthUser {
 export function getUser(): AuthUser | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = localStorage.getItem('ua_user')
+    const raw = sessionStorage.getItem('ua_user')
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
@@ -19,17 +19,17 @@ export function getUser(): AuthUser | null {
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null
-  return localStorage.getItem('ua_token')
+  return sessionStorage.getItem('ua_token')
 }
 
 export function saveAuth(token: string, user: AuthUser): void {
-  localStorage.setItem('ua_token', token)
-  localStorage.setItem('ua_user', JSON.stringify(user))
+  sessionStorage.setItem('ua_token', token)
+  sessionStorage.setItem('ua_user', JSON.stringify(user))
 }
 
 export function clearAuth(): void {
-  localStorage.removeItem('ua_token')
-  localStorage.removeItem('ua_user')
+  sessionStorage.removeItem('ua_token')
+  sessionStorage.removeItem('ua_user')
 }
 
 export function roleHome(role: string): string {

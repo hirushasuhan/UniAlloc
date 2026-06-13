@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { CheckCircle, XCircle, ShieldAlert } from 'lucide-react'
+import { HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineShieldExclamation } from 'react-icons/hi2'
 
 const ROLES = ['system_admin', 'dean', 'department_head', 'lecturer', 'on_study_leave']
 
@@ -75,7 +75,7 @@ export default function AdminPromotionsPage() {
 
   return (
     <DashboardLayout requiredRole="system_admin">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">Role Management & Promotions</h1>
           <p className="text-[var(--muted)] text-sm mt-1">Change user roles and manage promotion workflows</p>
@@ -144,7 +144,7 @@ export default function AdminPromotionsPage() {
       {pending.length > 0 && (
         <div className="glass-card mb-8">
           <div className="p-5 border-b border-[var(--border)] flex items-center gap-2">
-            <ShieldAlert className="text-amber-500" size={20}/>
+            <HiOutlineShieldExclamation className="text-amber-500" size={20}/>
             <h2 className="font-heading font-semibold text-lg">Pending Dean Approvals</h2>
           </div>
           <div className="divide-y divide-[var(--border)]/50">
@@ -162,11 +162,11 @@ export default function AdminPromotionsPage() {
                 <div className="flex gap-2">
                   <button disabled={loading} onClick={() => resolve(p.id, 'approve')}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 text-sm font-medium transition-colors">
-                    <CheckCircle size={15}/> Approve
+                    <HiOutlineCheckCircle size={15}/> Approve
                   </button>
                   <button disabled={loading} onClick={() => resolve(p.id, 'reject')}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-sm font-medium transition-colors">
-                    <XCircle size={15}/> Reject
+                    <HiOutlineXCircle size={15}/> Reject
                   </button>
                 </div>
               </div>

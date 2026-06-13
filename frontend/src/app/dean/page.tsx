@@ -6,10 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie
 } from 'recharts'
-import { 
-  ClipboardList, Users, Send, AlertTriangle, Search, 
-  ChevronRight, Mail, Phone, BookOpen, Clock, Briefcase, Award, Sparkles, UserCheck
-} from 'lucide-react'
+import { HiOutlineClipboardDocumentList, HiOutlineUsers, HiOutlinePaperAirplane, HiOutlineExclamationTriangle, HiOutlineMagnifyingGlass, HiOutlineChevronRight as ChevronRight, HiOutlineEnvelope as Mail, HiOutlinePhone as Phone, HiOutlineBookOpen, HiOutlineClock as Clock, HiOutlineBriefcase, HiOutlineTrophy, HiOutlineSparkles, HiOutlineUserPlus } from 'react-icons/hi2'
 
 export default function DeanDashboard() {
   const [assignments, setAssignments] = useState<any[]>([])
@@ -204,10 +201,10 @@ export default function DeanDashboard() {
       {/* KPI Section */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Total Assignments',   value: assignments.length,   icon: <ClipboardList size={18}/>, color: 'from-indigo-500 to-violet-600' },
-          { label: 'Pending',             value: pending,              icon: <ClipboardList size={18}/>, color: 'from-amber-500 to-orange-600' },
-          { label: 'In Progress',         value: inProg,               icon: <ClipboardList size={18}/>, color: 'from-blue-500 to-cyan-600' },
-          { label: 'Overloaded Lecturers',value: overloaded,           icon: <AlertTriangle size={18}/>, color: 'from-red-500 to-rose-600' },
+          { label: 'Total Assignments',   value: assignments.length,   icon: <HiOutlineClipboardDocumentList size={18}/>, color: 'from-indigo-500 to-violet-600' },
+          { label: 'Pending',             value: pending,              icon: <HiOutlineClipboardDocumentList size={18}/>, color: 'from-amber-500 to-orange-600' },
+          { label: 'In Progress',         value: inProg,               icon: <HiOutlineClipboardDocumentList size={18}/>, color: 'from-blue-500 to-cyan-600' },
+          { label: 'Overloaded Lecturers',value: overloaded,           icon: <HiOutlineExclamationTriangle size={18}/>, color: 'from-red-500 to-rose-600' },
         ].map(k => (
           <div key={k.label} className="glass-card p-5">
             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${k.color} flex items-center justify-center text-white mb-3`}>
@@ -229,7 +226,7 @@ export default function DeanDashboard() {
               : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'
           }`}
         >
-          <Sparkles size={16} /> Faculty Analytics
+          <HiOutlineSparkles size={16} /> Faculty Analytics
         </button>
         <button
           onClick={() => setActiveTab('staff')}
@@ -239,7 +236,7 @@ export default function DeanDashboard() {
               : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'
           }`}
         >
-          <Users size={16} /> Staff & Workloads
+          <HiOutlineUsers size={16} /> Staff & Workloads
         </button>
         <button
           onClick={() => setActiveTab('management')}
@@ -249,7 +246,7 @@ export default function DeanDashboard() {
               : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'
           }`}
         >
-          <UserCheck size={16} /> Staff Management
+          <HiOutlineUserPlus size={16} /> Staff Management
         </button>
       </div>
 
@@ -316,7 +313,7 @@ export default function DeanDashboard() {
             {/* Search & Filters */}
             <div className="space-y-3 mb-4">
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 text-[var(--muted)]" size={16} />
+                <HiOutlineMagnifyingGlass className="absolute left-3 top-2.5 text-[var(--muted)]" size={16} />
                 <input
                   type="text"
                   placeholder="Search staff by name/email..."
@@ -415,7 +412,7 @@ export default function DeanDashboard() {
             {!selectedLecturer ? (
               <div className="glass-card h-full flex flex-col items-center justify-center text-center p-8">
                 <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-500 flex items-center justify-center mb-4">
-                  <Users size={32} />
+                  <HiOutlineUsers size={32} />
                 </div>
                 <h3 className="font-heading font-semibold text-lg">No Staff Selected</h3>
                 <p className="text-[var(--muted)] text-sm mt-1 max-w-sm">
@@ -443,7 +440,7 @@ export default function DeanDashboard() {
                           </span>
                         </div>
                         <p className="text-sm text-[var(--muted)] mt-1 flex items-center gap-1.5">
-                          <Briefcase size={14} /> {selectedLecturer.dept_name ?? 'Unassigned Department'}
+                          <HiOutlineBriefcase size={14} /> {selectedLecturer.dept_name ?? 'Unassigned Department'}
                         </p>
                       </div>
                     </div>
@@ -543,7 +540,7 @@ export default function DeanDashboard() {
                     {/* Overload Alert Warning */}
                     {totalAllocated > capacity && (
                       <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/30 px-3 py-2.5 flex items-start gap-2">
-                        <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                        <HiOutlineExclamationTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
                         <div>
                           <p className="text-xs font-semibold text-red-600">Capacity Exceeded</p>
                           <p className="text-[10px] text-red-500 mt-0.5">
@@ -572,7 +569,7 @@ export default function DeanDashboard() {
 
                       <div className="flex justify-between items-center pb-3 border-b border-[var(--border)]/50">
                         <div className="flex items-center gap-2">
-                          <Briefcase size={16} className="text-indigo-500" />
+                          <HiOutlineBriefcase size={16} className="text-indigo-500" />
                           <span className="text-sm font-medium text-[var(--muted)]">Allocated Task Hours</span>
                         </div>
                         <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{totalAllocated.toFixed(1)} hrs</span>
@@ -580,7 +577,7 @@ export default function DeanDashboard() {
 
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <UserCheck size={16} className="text-emerald-500" />
+                          <HiOutlineUserPlus size={16} className="text-emerald-500" />
                           <span className="text-sm font-medium text-[var(--muted)]">Remaining Free Hours</span>
                         </div>
                         <span className={`text-sm font-bold ${available > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
@@ -622,7 +619,7 @@ export default function DeanDashboard() {
 
                   {lecturerAssignments.length === 0 ? (
                     <div className="text-center py-8 text-[var(--muted)] text-sm flex flex-col items-center justify-center">
-                      <BookOpen size={24} className="mb-2 text-slate-300" />
+                      <HiOutlineBookOpen size={24} className="mb-2 text-slate-300" />
                       No assignments found for this staff member.
                     </div>
                   ) : (
@@ -696,7 +693,7 @@ export default function DeanDashboard() {
           <div className="col-span-12 lg:col-span-5 glass-card p-6 bg-gradient-to-br from-[var(--card)] to-[var(--bg)]/10">
             <div className="flex items-center gap-2 mb-6">
               <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-                <Users size={18} />
+                <HiOutlineUsers size={18} />
               </div>
               <div>
                 <h3 className="font-heading font-semibold text-base">Add Academic Staff</h3>
@@ -885,7 +882,7 @@ export default function DeanDashboard() {
                               {isPromoting ? (
                                 <span className="w-3 h-3 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin shrink-0" />
                               ) : (
-                                <Award size={13} />
+                                <HiOutlineTrophy size={13} />
                               )}
                               Promote
                             </button>

@@ -117,4 +117,48 @@ class UserController
         AuditLogDao::log($auth['sub'], 'deactivate_user', 'users', $id);
         Response::success(['deactivated' => $ok]);
     }
+
+    public function resetPassword(array $params = []): void
+    {
+        $auth = JwtMiddleware::handle(['system_admin']);
+        $id   = (int)($params['id'] ?? 0);
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        
+        $defaultPass = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 8);
+        $newPassword = !empty($body['password']) ? $body['password'] : $defaultPass;
+        
+        $ok = UserDao::update($id, ['password' => $newPassword]);
+        if ($ok) {
+            AuditLogDao::log($auth['sub'], 'reset_password', 'users', $id);
+            Response::success([
+                'message' => 'Password reset successfully',
+                'new_password' => $newPassword
+            ]);
+        } else {
+            Response::error('Failed to reset password. User may not exist or internal error.', 500);
+        }
+    }
+
+    public function changePassword(array $params = []): void
+    {
+        $auth = JwtMiddleware::handle();
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        
+        if (empty($body['current_password']) || empty($body['new_password'])) {
+            Response::error('Current and new passwords are required', 400);
+        }
+        
+        $user = UserDao::findWithPassword($auth['sub']);
+        if (!$user || !password_verify($body['current_password'], $user['password_hash'])) {
+            Response::error('Incorrect current password', 401);
+        }
+        
+        $ok = UserDao::update($auth['sub'], ['password' => $body['new_password']]);
+        if ($ok) {
+            AuditLogDao::log($auth['sub'], 'change_password', 'users', $auth['sub']);
+            Response::success(['message' => 'Password changed successfully']);
+        } else {
+            Response::error('Failed to change password.', 500);
+        }
+    }
 }

@@ -48,6 +48,7 @@ $routes = [
 
     // Auth
     'POST /auth/login'                     => ['AuthController', 'login'],
+    'POST /auth/register'                  => ['AuthController', 'register'],
     'POST /auth/logout'                    => ['AuthController', 'logout'],
 
     // Users
@@ -56,6 +57,8 @@ $routes = [
     'GET /users/{id}'                      => ['UserController', 'show'],
     'PUT /users/{id}'                      => ['UserController', 'update'],
     'DELETE /users/{id}'                   => ['UserController', 'destroy'],
+    'POST /users/{id}/reset-password'      => ['UserController', 'resetPassword'],
+    'POST /users/me/change-password'       => ['UserController', 'changePassword'],
 
     // Faculties
     'GET /faculties'                       => ['FacultyController', 'index'],

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { Search, RefreshCw } from 'lucide-react'
+import { HiOutlineMagnifyingGlass, HiOutlineArrowPath } from 'react-icons/hi2'
 
 export default function AdminAuditLogsPage() {
   const [logs,    setLogs]    = useState<any[]>([])
@@ -35,18 +35,18 @@ export default function AdminAuditLogsPage() {
 
   return (
     <DashboardLayout requiredRole="system_admin">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">Audit Logs</h1>
           <p className="text-[var(--muted)] text-sm mt-1">{logs.length} entries (most recent 100)</p>
         </div>
         <button onClick={load} disabled={loading} className="btn-secondary">
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''}/> Refresh
+          <HiOutlineArrowPath size={15} className={loading ? 'animate-spin' : ''}/> Refresh
         </button>
       </div>
 
       <div className="relative mb-4 max-w-xs">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
+        <HiOutlineMagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
         <input value={search} onChange={e=>setSearch(e.target.value)}
           className="input pl-9" placeholder="Filter by user, action, entity…"/>
       </div>

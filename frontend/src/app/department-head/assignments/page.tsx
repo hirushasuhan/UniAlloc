@@ -4,7 +4,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import AssignmentModal from '@/components/ui/AssignmentModal'
 import { api } from '@/lib/api'
 import { getUser } from '@/lib/auth'
-import { Plus, Search } from 'lucide-react'
+import { HiOutlinePlus, HiOutlineMagnifyingGlass } from 'react-icons/hi2'
 
 const PRIORITY_COLOR: Record<string,string> = {
   urgent:'bg-red-100 text-red-700', high:'bg-orange-100 text-orange-700',
@@ -42,16 +42,16 @@ export default function DeptHeadAssignmentsPage() {
 
   return (
     <DashboardLayout requiredRole="department_head">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">Assignments</h1>
           <p className="text-[var(--muted)] text-sm mt-1">{assignments.length} assignments in your department</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary"><Plus size={16}/> New Assignment</button>
+        <button onClick={() => setShowModal(true)} className="btn-primary"><HiOutlinePlus size={16}/> New Assignment</button>
       </div>
 
       <div className="relative max-w-xs mb-5">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
+        <HiOutlineMagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"/>
         <input value={search} onChange={e=>setSearch(e.target.value)} className="input pl-9" placeholder="Search…"/>
       </div>
 

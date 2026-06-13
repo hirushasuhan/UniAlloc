@@ -9,10 +9,15 @@ class DepartmentController
 {
     public function index(array $params = []): void
     {
-        $auth      = JwtMiddleware::handle();
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        $auth = null;
+        if (str_starts_with($authHeader, 'Bearer ')) {
+            $auth = \App\Helpers\JwtHelper::validate(substr($authHeader, 7));
+        }
+
         $facultyId = null;
 
-        if ($auth['role'] === 'dean' && empty($_GET['all_faculties'])) {
+        if ($auth && $auth['role'] === 'dean' && empty($_GET['all_faculties'])) {
             $facultyId = $auth['faculty'];
         } elseif (!empty($_GET['faculty_id'])) {
             $facultyId = (int)$_GET['faculty_id'];

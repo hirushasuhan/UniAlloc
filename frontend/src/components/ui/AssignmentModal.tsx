@@ -2,7 +2,7 @@
 import { useState, FormEvent, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { getUser } from '@/lib/auth'
-import { X, Sparkles, Send } from 'lucide-react'
+import { HiOutlineXMark, HiOutlineSparkles, HiOutlinePaperAirplane } from 'react-icons/hi2'
 
 interface Props {
   users: any[]
@@ -103,7 +103,7 @@ export default function AssignmentModal({ users, depts, assignedBy, defaultDeptI
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="glass-card w-full max-w-lg p-6 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-[var(--muted)] hover:text-[var(--text)]"><X size={18}/></button>
+        <button onClick={onClose} className="absolute top-4 right-4 text-[var(--muted)] hover:text-[var(--text)]"><HiOutlineXMark size={18}/></button>
         
         <h2 className="font-heading font-semibold text-lg mb-4">Allocate Work</h2>
 
@@ -265,7 +265,7 @@ export default function AssignmentModal({ users, depts, assignedBy, defaultDeptI
             ) : (
               mode === 'direct' ? 'Create Assignment' : (
                 <span className="inline-flex items-center gap-1.5">
-                  <Send size={14} /> Send Cross-Faculty Request
+                  <HiOutlinePaperAirplane size={14} /> Send Cross-Faculty Request
                 </span>
               )
             )}

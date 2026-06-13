@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { HiOutlineExclamationTriangle, HiOutlineArrowPath } from 'react-icons/hi2'
 
 export default function DeptHeadWorkloadPage() {
   const [workload, setWorkload] = useState<any[]>([])
@@ -19,19 +19,19 @@ export default function DeptHeadWorkloadPage() {
 
   return (
     <DashboardLayout requiredRole="department_head">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">Workload Overview</h1>
           <p className="text-[var(--muted)] text-sm mt-1">Department capacity utilisation</p>
         </div>
         <button onClick={load} disabled={loading} className="btn-secondary">
-          <RefreshCw size={15} className={loading?'animate-spin':''}/> Refresh
+          <HiOutlineArrowPath size={15} className={loading?'animate-spin':''}/> Refresh
         </button>
       </div>
 
       {overloaded.length > 0 && (
         <div className="mb-5 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 flex items-start gap-3">
-          <AlertTriangle size={18} className="text-red-500 mt-0.5"/>
+          <HiOutlineExclamationTriangle size={18} className="text-red-500 mt-0.5"/>
           <div>
             <p className="text-sm font-semibold text-red-600">Overload Alert</p>
             <p className="text-sm text-red-500">{overloaded.map(w=>w.full_name).join(', ')} have exceeded the overload threshold.</p>

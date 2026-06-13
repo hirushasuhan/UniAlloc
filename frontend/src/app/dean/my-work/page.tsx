@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import { getUser } from '@/lib/auth'
-import { Briefcase, Send } from 'lucide-react'
+import { HiOutlineBriefcase, HiOutlinePaperAirplane } from 'react-icons/hi2'
 
 const PRIORITY_COLOR: Record<string, string> = {
   urgent: 'bg-red-100 text-red-700',
@@ -43,7 +43,7 @@ export default function DeanMyWorkPage() {
     <DashboardLayout requiredRole="dean">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white">
-          <Briefcase size={20} />
+          <HiOutlineBriefcase size={20} />
         </div>
         <div>
           <h1 className="text-2xl font-heading font-bold">My Work</h1>
@@ -63,7 +63,7 @@ export default function DeanMyWorkPage() {
 
       {assignments.length === 0 && (
         <div className="glass-card p-10 text-center">
-          <Briefcase size={32} className="mx-auto text-[var(--muted)] mb-3 opacity-40" />
+          <HiOutlineBriefcase size={32} className="mx-auto text-[var(--muted)] mb-3 opacity-40" />
           <p className="text-[var(--muted)]">No assignments have been assigned to you yet.</p>
         </div>
       )}

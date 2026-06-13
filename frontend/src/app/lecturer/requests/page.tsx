@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { CheckCircle, XCircle, Inbox } from 'lucide-react'
+import { HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineInbox } from 'react-icons/hi2'
 
 const STEP_LABEL: Record<string, string> = {
   pending_dean:      'Awaiting Dean',
@@ -44,7 +44,7 @@ export default function LecturerRequestsPage() {
     <DashboardLayout requiredRole="lecturer">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white">
-          <Inbox size={20} />
+          <HiOutlineInbox size={20} />
         </div>
         <div>
           <h1 className="text-2xl font-heading font-bold">Work Requests Inbox</h1>
@@ -88,11 +88,11 @@ export default function LecturerRequestsPage() {
               <div className="flex gap-2 flex-shrink-0">
                 <button onClick={() => act(r.id, 'accept')}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 text-green-700 hover:bg-green-500/20 text-sm font-medium">
-                  <CheckCircle size={14} /> Accept
+                  <HiOutlineCheckCircle size={14} /> Accept
                 </button>
                 <button onClick={() => act(r.id, 'reject')}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-700 hover:bg-red-500/20 text-sm font-medium">
-                  <XCircle size={14} /> Reject
+                  <HiOutlineXCircle size={14} /> Reject
                 </button>
               </div>
             </div>
@@ -102,7 +102,7 @@ export default function LecturerRequestsPage() {
 
       {inbox.length === 0 && other.length === 0 && (
         <div className="glass-card p-10 text-center">
-          <Inbox size={32} className="mx-auto text-[var(--muted)] mb-3 opacity-40" />
+          <HiOutlineInbox size={32} className="mx-auto text-[var(--muted)] mb-3 opacity-40" />
           <p className="text-[var(--muted)]">No work requests at the moment.</p>
         </div>
       )}

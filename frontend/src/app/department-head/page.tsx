@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { AlertTriangle } from 'lucide-react'
+import { HiOutlineExclamationTriangle } from 'react-icons/hi2'
 
 export default function DeptHeadDashboard() {
   const [workload,     setWorkload]     = useState<any[]>([])
@@ -38,7 +38,7 @@ export default function DeptHeadDashboard() {
 
       {overloaded.length > 0 && (
         <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 flex items-start gap-3">
-          <AlertTriangle size={18} className="text-red-500 mt-0.5 flex-shrink-0"/>
+          <HiOutlineExclamationTriangle size={18} className="text-red-500 mt-0.5 flex-shrink-0"/>
           <div>
             <p className="text-sm font-semibold text-red-600">Overload Alert</p>
             <p className="text-sm text-red-500">{overloaded.map(w => w.full_name).join(', ')} exceeded capacity threshold.</p>
