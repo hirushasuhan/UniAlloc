@@ -103,7 +103,7 @@ class UserDao
         $fields = [];
         $bind   = [':id' => $id];
 
-        foreach (['full_name','contact','capacity_hours','department_id','is_active'] as $col) {
+        foreach (['full_name','email','contact','capacity_hours','department_id','is_active'] as $col) {
             if (array_key_exists($col, $data)) {
                 $fields[] = "$col = :$col";
                 $bind[":$col"] = $data[$col];

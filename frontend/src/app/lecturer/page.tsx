@@ -4,6 +4,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { getUser } from '@/lib/auth'
+import DashboardBanner from '@/components/ui/DashboardBanner'
 
 export default function LecturerDashboard() {
   const [assignments, setAssignments] = useState<any[]>([])
@@ -34,6 +35,7 @@ export default function LecturerDashboard() {
 
   return (
     <DashboardLayout requiredRole="lecturer">
+      <DashboardBanner />
       <h1 className="text-2xl font-heading font-bold mb-2">My Dashboard</h1>
       <p className="text-[var(--muted)] text-sm mb-8">Track your assignments and workload</p>
 

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
+import DashboardBanner from '@/components/ui/DashboardBanner'
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie
@@ -195,6 +196,7 @@ export default function DeanDashboard() {
 
   return (
     <DashboardLayout requiredRole="dean">
+      <DashboardBanner />
       <h1 className="text-2xl font-heading font-bold mb-2">Dean Dashboard</h1>
       <p className="text-[var(--muted)] text-sm mb-8">Faculty-wide workload & assignment overview</p>
 

@@ -1,10 +1,13 @@
 'use client'
 import Link from 'next/link'
+import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { clearAuth, AuthUser } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import ThemeToggle from '@/components/ui/ThemeToggle'
-import { HiOutlineSquares2X2, HiOutlineUsers, HiOutlineBookOpen, HiOutlineChartBar, HiOutlineBell, HiOutlineCog6Tooth, HiOutlineArrowRightOnRectangle, HiOutlineDocumentText, HiOutlinePaperAirplane, HiOutlineTrophy, HiOutlineClipboardDocumentList, HiOutlineBriefcase, HiOutlineInbox, HiOutlineXMark } from 'react-icons/hi2'
+import SettingsModal from '@/components/ui/SettingsModal'
+import AboutUsModal from '@/components/ui/AboutUsModal'
+import ChangePasswordModal from '@/components/ui/ChangePasswordModal'
+import { HiOutlineSquares2X2, HiOutlineUsers, HiOutlineBookOpen, HiOutlineChartBar, HiOutlineBell, HiOutlineCog6Tooth, HiOutlineArrowRightOnRectangle, HiOutlineDocumentText, HiOutlinePaperAirplane, HiOutlineTrophy, HiOutlineClipboardDocumentList, HiOutlineBriefcase, HiOutlineInbox, HiOutlineXMark, HiOutlineQuestionMarkCircle } from 'react-icons/hi2'
 
 interface NavItem { href: string; label: string; icon: React.ReactNode }
 
@@ -55,15 +58,12 @@ function roleSlug(role: string) {
   return { system_admin: 'admin', dean: 'dean', department_head: 'department-head', lecturer: 'lecturer', student: 'student' }[role] ?? 'login'
 }
 
-export default function Sidebar({ user, open = false, onClose }: { user: AuthUser; open?: boolean; onClose?: () => void }) {
+export default function Sidebar({ user, open = false, onClose, onUpdateUser }: { user: AuthUser; open?: boolean; onClose?: () => void; onUpdateUser?: (updated: AuthUser) => void }) {
   const pathname = usePathname()
-  const router   = useRouter()
   const items    = navItems(user.role)
-
-  function logout() {
-    clearAuth()
-    router.push('/login')
-  }
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showAboutUsModal, setShowAboutUsModal] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
 
   return (
     <>
@@ -123,28 +123,34 @@ export default function Sidebar({ user, open = false, onClose }: { user: AuthUse
           })}
         </nav>
 
-        {/* Theme toggle */}
-        <div className="mt-4">
-          <ThemeToggle />
-        </div>
 
-        {/* User + logout */}
-        <div className="mt-4 pt-4 border-t border-[var(--border)]">
-          <div className="flex items-center gap-3 px-2 mb-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}>
-              {user.full_name[0]}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user.full_name}</p>
-              <p className="text-xs text-[var(--muted)] truncate">{user.email}</p>
-            </div>
-          </div>
-          <button onClick={logout}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-            <HiOutlineArrowRightOnRectangle size={16}/> Sign out
+        {/* Support & Settings at the bottom of navigation */}
+        <div className="mt-auto pt-4 pb-4 border-t border-[var(--border)] px-3 space-y-1">
+          <button onClick={() => setShowSettingsModal(true)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors">
+            <HiOutlineCog6Tooth size={18}/> Settings
+          </button>
+          <button onClick={() => setShowAboutUsModal(true)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors">
+            <HiOutlineQuestionMarkCircle size={18}/> Support
           </button>
         </div>
       </aside>
+
+      {showSettingsModal && (
+        <SettingsModal 
+          user={user} 
+          onClose={() => setShowSettingsModal(false)} 
+          onChangePasswordClick={() => {
+            setShowSettingsModal(false)
+            setShowPasswordModal(true)
+          }}
+          onUpdateUser={(updated) => onUpdateUser && onUpdateUser(updated)}
+        />
+      )}
+
+      {showAboutUsModal && <AboutUsModal onClose={() => setShowAboutUsModal(false)} />}
+      {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
     </>
   )
 }

@@ -4,6 +4,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { HiOutlineExclamationTriangle } from 'react-icons/hi2'
+import DashboardBanner from '@/components/ui/DashboardBanner'
 
 export default function DeptHeadDashboard() {
   const [workload,     setWorkload]     = useState<any[]>([])
@@ -33,8 +34,13 @@ export default function DeptHeadDashboard() {
 
   return (
     <DashboardLayout requiredRole="department_head">
-      <h1 className="text-2xl font-heading font-bold mb-2">Department Head Dashboard</h1>
-      <p className="text-[var(--muted)] text-sm mb-8">Manage your department's assignments and workload</p>
+      <DashboardBanner />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-heading font-bold mb-1">Department Head Dashboard</h1>
+          <p className="text-[var(--muted)] text-sm">Manage your department's assignments and workload</p>
+        </div>
+      </div>
 
       {overloaded.length > 0 && (
         <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 flex items-start gap-3">

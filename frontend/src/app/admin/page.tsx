@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
+import DashboardBanner from '@/components/ui/DashboardBanner'
 import { HiOutlineUsers, HiOutlineBookOpen, HiOutlineChartBar, HiOutlineDocumentText } from 'react-icons/hi2'
 
 export default function AdminDashboard() {
@@ -35,6 +36,7 @@ export default function AdminDashboard() {
 
   return (
     <DashboardLayout requiredRole="system_admin">
+      <DashboardBanner />
       <h1 className="text-2xl font-heading font-bold mb-2">System Admin Dashboard</h1>
       <p className="text-[var(--muted)] text-sm mb-8">Full platform overview and control</p>
 

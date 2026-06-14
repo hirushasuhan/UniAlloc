@@ -5,6 +5,8 @@ export interface AuthUser {
   role: 'system_admin' | 'dean' | 'department_head' | 'lecturer' | 'student'
   dept_id: number | null
   faculty_id: number | null
+  faculty_name?: string | null
+  contact?: string | null
 }
 
 export function getUser(): AuthUser | null {

@@ -23,10 +23,12 @@ class AuthController
             'SELECT u.id, u.full_name, u.email, u.password_hash, u.is_active,
                     u.capacity_hours, u.department_id, u.enrollment_number,
                     r.role_name,
-                    d.faculty_id
+                    d.faculty_id,
+                    f.faculty_name
              FROM users u
              JOIN roles r ON r.id = u.role_id
              LEFT JOIN departments d ON d.id = u.department_id
+             LEFT JOIN faculties f ON f.id = d.faculty_id
              WHERE u.email = :email
              LIMIT 1'
         );
@@ -43,20 +45,23 @@ class AuthController
 
         // For deans, look up faculty_id from faculties table
         $facultyId = $user['faculty_id'];
+        $facultyName = $user['faculty_name'] ?? null;
         if ($user['role_name'] === 'dean') {
-            $fs = $db->prepare('SELECT id FROM faculties WHERE dean_id = :uid LIMIT 1');
+            $fs = $db->prepare('SELECT id, faculty_name FROM faculties WHERE dean_id = :uid LIMIT 1');
             $fs->execute([':uid' => $user['id']]);
             $frow = $fs->fetch();
             $facultyId = $frow['id'] ?? null;
+            $facultyName = $frow['faculty_name'] ?? null;
         }
 
         $payload = [
-            'sub'     => (int)$user['id'],
-            'name'    => $user['full_name'],
-            'email'   => $user['email'],
-            'role'    => $user['role_name'],
-            'dept'    => $user['department_id'] ? (int)$user['department_id'] : null,
-            'faculty' => $facultyId ? (int)$facultyId : null,
+            'sub'          => (int)$user['id'],
+            'name'         => $user['full_name'],
+            'email'        => $user['email'],
+            'role'         => $user['role_name'],
+            'dept'         => $user['department_id'] ? (int)$user['department_id'] : null,
+            'faculty'      => $facultyId ? (int)$facultyId : null,
+            'faculty_name' => $facultyName,
         ];
 
         $token = JwtHelper::generate($payload);
@@ -72,6 +77,7 @@ class AuthController
                 'role'              => $user['role_name'],
                 'dept_id'           => $user['department_id'] ? (int)$user['department_id'] : null,
                 'faculty_id'        => $facultyId ? (int)$facultyId : null,
+                'faculty_name'      => $facultyName,
                 'enrollment_number' => $user['enrollment_number'] ?? null,
                 'contact'           => $user['contact'] ?? null,
             ],
@@ -138,10 +144,11 @@ class AuthController
             // Auto-login logic
             $stmt = $db->prepare(
                 'SELECT u.id, u.full_name, u.email, u.department_id, u.enrollment_number,
-                        r.role_name, d.faculty_id
+                        r.role_name, d.faculty_id, f.faculty_name
                  FROM users u
                  JOIN roles r ON r.id = u.role_id
                  LEFT JOIN departments d ON d.id = u.department_id
+                 LEFT JOIN faculties f ON f.id = d.faculty_id
                  WHERE u.id = :id
                  LIMIT 1'
             );
@@ -149,14 +156,16 @@ class AuthController
             $user = $stmt->fetch();
 
             $facultyId = $user['faculty_id'] ? (int)$user['faculty_id'] : null;
+            $facultyName = $user['faculty_name'] ?? null;
 
             $payload = [
-                'sub'     => (int)$user['id'],
-                'name'    => $user['full_name'],
-                'email'   => $user['email'],
-                'role'    => $user['role_name'],
-                'dept'    => $user['department_id'] ? (int)$user['department_id'] : null,
-                'faculty' => $facultyId,
+                'sub'          => (int)$user['id'],
+                'name'         => $user['full_name'],
+                'email'        => $user['email'],
+                'role'         => $user['role_name'],
+                'dept'         => $user['department_id'] ? (int)$user['department_id'] : null,
+                'faculty'      => $facultyId,
+                'faculty_name' => $facultyName,
             ];
 
             $token = JwtHelper::generate($payload);
@@ -170,6 +179,7 @@ class AuthController
                     'role'              => $user['role_name'],
                     'dept_id'           => $user['department_id'] ? (int)$user['department_id'] : null,
                     'faculty_id'        => $facultyId,
+                    'faculty_name'      => $facultyName,
                     'enrollment_number' => $user['enrollment_number'] ?? null,
                     'contact'           => null,
                 ],

@@ -2,6 +2,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
+import DashboardBanner from '@/components/ui/DashboardBanner'
 import { getUser } from '@/lib/auth'
 
 export default function StudentPortal() {
@@ -55,8 +56,9 @@ export default function StudentPortal() {
 
   return (
     <DashboardLayout requiredRole="student">
-      <h1 className="text-2xl font-heading font-bold mb-2">Student Request Portal</h1>
-      <p className="text-[var(--muted)] text-sm mb-8">Submit a supervisor request for your project or thesis</p>
+      <DashboardBanner />
+      <h1 className="text-2xl font-heading font-bold mb-2">Student Dashboard</h1>
+      <p className="text-[var(--muted)] text-sm mb-8">Request and track supervisor allocations</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Submission Form */}

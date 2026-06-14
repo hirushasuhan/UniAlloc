@@ -166,6 +166,11 @@
   .input::placeholder { color: var(--muted); }
   .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 
+  select.input option {
+    background-color: var(--card-solid);
+    color: var(--text);
+  }
+
   .badge {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
   }
