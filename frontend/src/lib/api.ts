@@ -4,10 +4,10 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api'
 
 export const api = axios.create({ baseURL: BASE })
 
-// Attach JWT from localStorage on every request
+// Attach JWT from sessionStorage on every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('ua_token')
+    const token = sessionStorage.getItem('ua_token')
     if (token) config.headers.Authorization = `Bearer ${token}`
   }
   return config
@@ -18,8 +18,8 @@ api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('ua_token')
-      localStorage.removeItem('ua_user')
+      sessionStorage.removeItem('ua_token')
+      sessionStorage.removeItem('ua_user')
       window.location.href = '/login'
     }
     return Promise.reject(err)
