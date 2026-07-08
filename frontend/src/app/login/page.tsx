@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { saveAuth, roleHome } from '@/lib/auth'
 
 // Icons from react-icons
-import { HiOutlineUserGroup, HiOutlineAcademicCap, HiOutlineChevronRight, HiOutlineChevronLeft, HiOutlineExclamationCircle } from 'react-icons/hi2'
+import { HiOutlineUserGroup, HiOutlineAcademicCap, HiOutlineChevronRight, HiOutlineChevronLeft, HiOutlineExclamationCircle, HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2'
 import { AiOutlineLoading3Quarters } from 'react-icons/ai'
 
 type ViewState = 'select' | 'staff-login' | 'student-login' | 'student-register'
@@ -25,6 +25,7 @@ export default function LoginPage() {
   
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (view === 'student-register' && departments.length === 0) {
@@ -41,6 +42,7 @@ export default function LoginPage() {
     setEnrollmentNo('')
     setDeptId('')
     setError('')
+    setShowPassword(false)
   }
 
   const changeView = (v: ViewState) => {
@@ -198,15 +200,26 @@ export default function LoginPage() {
                 Forgot?
               </button>
             </div>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className={`w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3.5 text-sm text-white
-                         placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-${colorClass}-500/50 focus:border-${colorClass}-500 transition-all`}
-              placeholder="••••••••"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className={`w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3.5 pr-12 text-sm text-white
+                           placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-${colorClass}-500/50 focus:border-${colorClass}-500 transition-all`}
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(s => !s)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+              >
+                {showPassword ? <HiOutlineEyeSlash className="w-5 h-5" /> : <HiOutlineEye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
           
           <button
@@ -320,15 +333,26 @@ export default function LoginPage() {
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2.5 text-sm text-white
-                       placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
-            placeholder="••••••••"
-            required
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2.5 pr-12 text-sm text-white
+                         placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+              placeholder="••••••••"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(s => !s)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              tabIndex={-1}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+            >
+              {showPassword ? <HiOutlineEyeSlash className="w-5 h-5" /> : <HiOutlineEye className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
         <button
           type="submit"

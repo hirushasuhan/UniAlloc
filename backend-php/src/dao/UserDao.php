@@ -10,8 +10,16 @@ class UserDao
     public static function list(array $auth, array $filters = []): array
     {
         $db   = Db::connection();
-        $where = ['u.is_active = 1'];
+        $where = [];
         $bind  = [];
+
+        // By default only active users are listed; admins can request everyone
+        // (needed to see & reactivate deactivated accounts)
+        if (empty($filters['include_inactive'])) {
+            $where[] = 'u.is_active = 1';
+        } else {
+            $where[] = '1=1';
+        }
 
         // Scope: dean → faculty; dept_head → dept; lecturer/student → own only (handled in controller)
         if (isset($filters['department_id'])) {
@@ -167,6 +175,69 @@ class UserDao
         $stmt = $db->prepare($sql);
         $stmt->execute($bind);
         return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * PERMANENTLY delete a user and everything related to them.
+     * Runs in a transaction so it's all-or-nothing.
+     */
+    public static function hardDelete(int $id): bool
+    {
+        $db = Db::connection();
+        $db->beginTransaction();
+        try {
+            // 1. Progress logs — theirs, and those on assignments being removed
+            $db->prepare(
+                'DELETE FROM assignment_progress
+                 WHERE updated_by = :uid
+                    OR assignment_id IN (SELECT id FROM assignments WHERE assigned_to = :uid2 OR assigned_by = :uid3)'
+            )->execute([':uid' => $id, ':uid2' => $id, ':uid3' => $id]);
+
+            // 2. Assignments they were given or created
+            $db->prepare('DELETE FROM assignments WHERE assigned_to = :uid OR assigned_by = :uid2')
+               ->execute([':uid' => $id, ':uid2' => $id]);
+
+            // 3. Workload appeals they submitted (+ detach ones they reviewed)
+            $db->prepare('UPDATE workload_appeals SET reviewed_by = NULL WHERE reviewed_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM workload_appeals WHERE lecturer_id = :uid')->execute([':uid' => $id]);
+
+            // 4. Work requests they made (+ detach where they were target/approver)
+            $db->prepare('UPDATE work_requests SET target_user_id = NULL WHERE target_user_id = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE work_requests SET resolved_by = NULL WHERE resolved_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE work_requests SET dean_approved_by = NULL WHERE dean_approved_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE work_requests SET dept_head_approved_by = NULL WHERE dept_head_approved_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM work_requests WHERE requester_id = :uid')->execute([':uid' => $id]);
+
+            // 5. Student requests they submitted (+ detach where supervisor/reviewer)
+            $db->prepare('UPDATE student_requests SET assigned_to = NULL WHERE assigned_to = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE student_requests SET reviewed_by = NULL WHERE reviewed_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM student_requests WHERE student_id = :uid')->execute([':uid' => $id]);
+
+            // 6. Role promotions about them (+ detach where they promoted/approved others)
+            $db->prepare('UPDATE role_promotions SET promoted_by = NULL WHERE promoted_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE role_promotions SET approved_by = NULL WHERE approved_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM role_promotions WHERE user_id = :uid')->execute([':uid' => $id]);
+
+            // 7. Notifications & audit logs
+            $db->prepare('DELETE FROM notifications WHERE user_id = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM audit_logs WHERE user_id = :uid')->execute([':uid' => $id]);
+
+            // 8. Leadership references & settings
+            $db->prepare('UPDATE faculties SET dean_id = NULL WHERE dean_id = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE departments SET head_id = NULL WHERE head_id = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE settings SET updated_by = NULL WHERE updated_by = :uid')->execute([':uid' => $id]);
+
+            // 9. Finally, the user record itself
+            $stmt = $db->prepare('DELETE FROM users WHERE id = :uid');
+            $stmt->execute([':uid' => $id]);
+            $deleted = $stmt->rowCount() > 0;
+
+            $db->commit();
+            return $deleted;
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
     }
 
     public static function roleIdByName(string $name): ?int

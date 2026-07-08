@@ -15,6 +15,10 @@ class UserController
 
         switch ($auth['role']) {
             case 'system_admin':
+                // Admin can include deactivated accounts (to reactivate or delete them)
+                if (!empty($_GET['include_inactive'])) {
+                    $filters['include_inactive'] = true;
+                }
                 break; // all users
             case 'dean':
                 if (empty($_GET['all_faculties'])) {
@@ -146,7 +150,19 @@ class UserController
     {
         $auth = JwtMiddleware::handle(['system_admin']);
         $id   = (int)($params['id'] ?? 0);
-        $ok   = UserDao::update($id, ['is_active' => 0]);
+
+        if ($id === (int)$auth['sub']) {
+            Response::error('You cannot deactivate or delete your own account.', 422);
+        }
+
+        // ?permanent=1 → hard delete: remove the user AND everything related to them
+        if (!empty($_GET['permanent'])) {
+            AuditLogDao::log($auth['sub'], 'delete_user_permanent', 'users', $id);
+            $ok = UserDao::hardDelete($id);
+            Response::success(['deleted' => $ok], 'User and all related data permanently deleted');
+        }
+
+        $ok = UserDao::update($id, ['is_active' => 0]);
         AuditLogDao::log($auth['sub'], 'deactivate_user', 'users', $id);
         Response::success(['deactivated' => $ok]);
     }

@@ -20,6 +20,8 @@ export default function TopBar({ user, onUpdateUser, onOpenNav }: Props) {
   const [showNotifications, setShowNotifications] = useState(false)
 
   const [notifications, setNotifications] = useState<any[]>([])
+  const [institution, setInstitution] = useState('')
+  const [now, setNow] = useState<Date | null>(null)
 
   useEffect(() => {
     // Only fetch when the dropdown is opened, or just fetch once
@@ -27,6 +29,18 @@ export default function TopBar({ user, onUpdateUser, onOpenNav }: Props) {
       // Show top 5 recent notifications
       setNotifications(r.data.data?.slice(0, 5) ?? [])
     }).catch(() => {})
+
+    // Institution name (saved by admin in Settings)
+    api.get('/settings').then(r => {
+      const rows = r.data.data ?? []
+      const item = rows.find((s: any) => s.setting_key === 'institution_name')
+      if (item?.setting_value) setInstitution(item.setting_value)
+    }).catch(() => {})
+
+    // Live clock — set after mount (avoids SSR hydration mismatch), tick every second
+    setNow(new Date())
+    const t = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(t)
   }, [])
   
   const unreadCount = notifications.filter(n => !n.is_read).length
@@ -34,8 +48,8 @@ export default function TopBar({ user, onUpdateUser, onOpenNav }: Props) {
   return (
     <>
       <header className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 bg-[var(--bg)]/80 backdrop-blur-md border-b border-[var(--border)]">
-        {/* Left Side: Mobile Menu Button */}
-        <div className="flex items-center gap-4">
+        {/* Left Side: Mobile Menu Button + Institution & Clock */}
+        <div className="flex items-center gap-4 min-w-0">
           <button
             onClick={onOpenNav}
             aria-label="Open menu"
@@ -43,6 +57,19 @@ export default function TopBar({ user, onUpdateUser, onOpenNav }: Props) {
           >
             <HiOutlineBars3 size={20} />
           </button>
+
+          {institution && (
+            <div className="min-w-0">
+              <h2 className="font-heading font-bold text-sm sm:text-base leading-tight truncate">{institution}</h2>
+              {now && (
+                <p className="text-[11px] sm:text-xs text-[var(--muted)] mt-0.5 truncate">
+                  {now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  <span className="mx-1.5">·</span>
+                  {now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Side */}

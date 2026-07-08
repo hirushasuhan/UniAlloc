@@ -2,7 +2,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
-import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineUserPlus, HiOutlineUserMinus, HiOutlineXMark, HiOutlineKey } from 'react-icons/hi2'
+import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineUserPlus, HiOutlineUserMinus, HiOutlineXMark, HiOutlineKey, HiOutlineTrash } from 'react-icons/hi2'
 
 const ROLES = ['system_admin','dean','department_head','lecturer','student']
 const POSITIONS = ['Senior Prof', 'Prof', 'Dr', 'Senior Lecturer', 'Lecturer', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
@@ -13,6 +13,7 @@ export default function AdminUsersPage() {
   const [faculties, setFaculties] = useState<any[]>([])
   const [search,  setSearch]  = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [showModal, setShowModal]   = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [msg,     setMsg]     = useState<{text:string;ok:boolean}|null>(null)
@@ -26,7 +27,8 @@ export default function AdminUsersPage() {
   })
 
   const load = () => {
-    api.get('/users').then(r => setUsers(r.data.data ?? []))
+    // include_inactive → deactivated accounts stay visible so they can be reactivated/deleted
+    api.get('/users?include_inactive=1').then(r => setUsers(r.data.data ?? []))
     api.get('/departments').then(r => setDepts(r.data.data ?? []))
     api.get('/faculties').then(r => setFaculties(r.data.data ?? []))
   }
@@ -48,7 +50,8 @@ export default function AdminUsersPage() {
     const matchSearch = u.full_name.toLowerCase().includes(search.toLowerCase()) ||
                         u.email.toLowerCase().includes(search.toLowerCase())
     const matchRole   = roleFilter ? u.role_name === roleFilter : true
-    return matchSearch && matchRole
+    const matchStatus = statusFilter === '' ? true : (statusFilter === 'active' ? !!u.is_active : !u.is_active)
+    return matchSearch && matchRole && matchStatus
   })
 
   async function handleCreate(e: FormEvent) {
@@ -72,8 +75,30 @@ export default function AdminUsersPage() {
   }
 
   async function toggleActive(id:number, current:number) {
-    await api.put(`/users/${id}`, { is_active: current ? 0 : 1 })
-    load()
+    try {
+      await api.put(`/users/${id}`, { is_active: current ? 0 : 1 })
+      setMsg({ text: current ? 'User deactivated. You can reactivate them anytime.' : 'User reactivated successfully.', ok: true })
+      load()
+    } catch(err:any) {
+      setMsg({ text: err.response?.data?.message ?? 'Failed to update user status.', ok: false })
+    }
+  }
+
+  async function deleteUser(u: any) {
+    const warning =
+      `PERMANENTLY DELETE "${u.full_name}"?\n\n` +
+      `This will remove the user AND all their data from the system:\n` +
+      `• Assignments & progress logs\n• Work requests & appeals\n` +
+      `• Student requests & notifications\n• Promotion & audit history\n\n` +
+      `This CANNOT be undone. Continue?`
+    if (!confirm(warning)) return
+    try {
+      await api.delete(`/users/${u.id}?permanent=1`)
+      setMsg({ text: `"${u.full_name}" and all related data were permanently deleted.`, ok: true })
+      load()
+    } catch(err:any) {
+      setMsg({ text: err.response?.data?.message ?? 'Failed to delete user.', ok: false })
+    }
   }
 
   async function updatePosition(id:number, position:string) {
@@ -137,6 +162,11 @@ export default function AdminUsersPage() {
             </option>
           ))}
         </select>
+        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} className="input max-w-[150px]">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
 
       {/* Table */}
@@ -185,6 +215,10 @@ export default function AdminUsersPage() {
                     className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg transition-colors
                       ${u.is_active ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
                     {u.is_active ? <><HiOutlineUserMinus size={13}/> Deactivate</> : <><HiOutlineUserPlus size={13}/> Activate</>}
+                  </button>
+                  <button onClick={() => deleteUser(u)} title="Permanently delete this user and all their data"
+                    className="inline-flex items-center justify-center w-7 h-7 bg-white/5 hover:bg-red-500/20 text-red-500 rounded-md transition-colors border border-white/5 hover:border-red-500/30">
+                    <HiOutlineTrash size={14} />
                   </button>
                 </td>
               </tr>
