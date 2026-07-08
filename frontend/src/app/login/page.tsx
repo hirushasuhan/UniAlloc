@@ -144,7 +144,7 @@ export default function LoginPage() {
 
       <div className="mt-8 pt-6">
         <p className="text-xs text-zinc-600 text-center font-medium tracking-wide uppercase">
-          Test: admin@university.edu / Admin@123
+          © {new Date().getFullYear()} UniAlloc. All rights reserved.
         </p>
       </div>
     </div>
