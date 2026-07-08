@@ -13,14 +13,19 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Global 401 → redirect to login
+// Global 401 (invalid/expired/tampered token) → purge everything & show Access Denied
 api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
-      sessionStorage.removeItem('ua_token')
-      sessionStorage.removeItem('ua_user')
-      window.location.href = '/login'
+      // Avoid a redirect loop when the login attempt itself returns 401
+      const isLoginCall = err.config?.url?.includes('/auth/login')
+      if (!isLoginCall) {
+        import('@/lib/auth').then(({ purgeAllClientData }) => {
+          purgeAllClientData()
+          window.location.replace('/no-access')
+        })
+      }
     }
     return Promise.reject(err)
   }

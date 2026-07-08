@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getUser, AuthUser } from '@/lib/auth'
+import { getUser, getToken, AuthUser } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 
@@ -16,10 +16,15 @@ export default function DashboardLayout({ children, requiredRole }: {
 
   useEffect(() => {
     const u = getUser()
-    if (!u) { router.replace('/login'); return }
+    const token = getToken()
+
+    // Not logged in at all (no session / tampered storage) → access denied
+    if (!u || !token) { router.replace('/no-access'); return }
+
+    // Logged in but wrong role for this panel → access denied
     if (requiredRole) {
       const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole]
-      if (!allowed.includes(u.role)) { router.replace('/login'); return }
+      if (!allowed.includes(u.role)) { router.replace('/no-access'); return }
     }
     setUser(u)
   }, [])
