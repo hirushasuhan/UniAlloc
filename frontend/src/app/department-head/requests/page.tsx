@@ -51,9 +51,9 @@ export default function DeptHeadRequestsPage() {
         .then(r => setUsers(r.data.data ?? []))
         .catch(() => setUsers([]))
     } else if (form.request_type === 'cross_department') {
-      // Show lecturers from other departments
-      api.get('/users?role=lecturer')
-        .then(r => setUsers(r.data.data ?? []))
+      // Show lecturers from other departments in the SAME faculty
+      api.get(`/users?role=lecturer&faculty_id=${user?.faculty_id ?? ''}`)
+        .then(r => setUsers((r.data.data ?? []).filter((u: any) => u.department_id !== user?.dept_id)))
         .catch(() => setUsers([]))
     } else {
       setUsers([])

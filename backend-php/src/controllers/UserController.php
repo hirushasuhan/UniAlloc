@@ -26,7 +26,11 @@ class UserController
                 }
                 break;
             case 'department_head':
-                $filters['department_id'] = $auth['dept'];
+                // Own department by default, but cross-department / cross-faculty
+                // request targeting needs a wider staff directory
+                if (empty($_GET['all_faculties']) && empty($_GET['faculty_id'])) {
+                    $filters['department_id'] = $auth['dept'];
+                }
                 break;
             default:
                 Response::error('Forbidden', 403);
