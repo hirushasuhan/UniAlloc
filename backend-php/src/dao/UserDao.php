@@ -19,15 +19,18 @@ class UserDao
             $bind[':dept_id'] = $filters['department_id'];
         }
         if (isset($filters['faculty_id'])) {
-            $where[] = '(d.faculty_id = :faculty_id OR (r.role_name = \'dean\' AND f_dean.id = :faculty_id))';
-            $bind[':faculty_id'] = $filters['faculty_id'];
+            // NOTE: PDO with emulated prepares disabled does not allow reusing the
+            // same named placeholder twice, so two distinct placeholders are used.
+            $where[] = '(d.faculty_id = :faculty_id OR (r.role_name = \'dean\' AND f_dean.id = :faculty_id_dean))';
+            $bind[':faculty_id']      = $filters['faculty_id'];
+            $bind[':faculty_id_dean'] = $filters['faculty_id'];
         }
         if (isset($filters['role_name'])) {
             $where[] = 'r.role_name = :role_name';
             $bind[':role_name'] = $filters['role_name'];
         }
 
-        $sql = 'SELECT u.id, u.full_name, u.email, u.role_id, r.role_name,
+        $sql = 'SELECT u.id, u.full_name, u.position, u.email, u.role_id, r.role_name,
                        u.department_id, d.dept_name,
                        COALESCE(d.faculty_id, f_dean.id) AS faculty_id,
                        COALESCE(f.faculty_name, f_dean.faculty_name) AS faculty_name,
@@ -49,7 +52,7 @@ class UserDao
     {
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'SELECT u.id, u.full_name, u.email, u.role_id, r.role_name,
+            'SELECT u.id, u.full_name, u.position, u.email, u.role_id, r.role_name,
                     u.department_id, d.dept_name,
                     COALESCE(d.faculty_id, f_dean.id) AS faculty_id,
                     COALESCE(f.faculty_name, f_dean.faculty_name) AS faculty_name,
@@ -75,17 +78,62 @@ class UserDao
         return $row ?: null;
     }
 
+    /**
+     * Resolve the Department Head's user id for a department.
+     * Prefers departments.head_id, but falls back to looking up the active
+     * user with the department_head role in that department (head_id is not
+     * always maintained when heads are created directly).
+     */
+    public static function departmentHeadId(int $departmentId): ?int
+    {
+        if (!$departmentId) return null;
+        $db = Db::connection();
+
+        $stmt = $db->prepare('SELECT head_id FROM departments WHERE id = :did');
+        $stmt->execute([':did' => $departmentId]);
+        $row = $stmt->fetch();
+        if ($row && $row['head_id']) return (int)$row['head_id'];
+
+        $stmt = $db->prepare(
+            "SELECT u.id FROM users u
+             JOIN roles r ON r.id = u.role_id
+             WHERE u.department_id = :did
+               AND r.role_name = 'department_head'
+               AND u.is_active = 1
+             LIMIT 1"
+        );
+        $stmt->execute([':did' => $departmentId]);
+        $row = $stmt->fetch();
+        return $row ? (int)$row['id'] : null;
+    }
+
+    /**
+     * SQL expression producing a display name with the position prefixed,
+     * e.g. "Dr. Jane Silva". Falls back to full_name when position is NULL.
+     */
+    public static function displayNameSql(string $alias): string
+    {
+        return "TRIM(CONCAT(COALESCE(CONCAT($alias.position, '. '), ''), $alias.full_name))";
+    }
+
+    /** Allowed academic/professional position titles (shown as a dropdown on the frontend) */
+    public const POSITIONS = [
+        'Senior Prof', 'Prof', 'Dr', 'Senior Lecturer', 'Lecturer',
+        'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero',
+    ];
+
     public static function create(array $data): int
     {
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'INSERT INTO users (full_name, email, password_hash, role_id, department_id,
+            'INSERT INTO users (full_name, position, email, password_hash, role_id, department_id,
                                 enrollment_number, contact, capacity_hours)
-             VALUES (:full_name, :email, :password_hash, :role_id, :department_id,
+             VALUES (:full_name, :position, :email, :password_hash, :role_id, :department_id,
                      :enrollment_number, :contact, :capacity_hours)'
         );
         $stmt->execute([
             ':full_name'         => $data['full_name'],
+            ':position'          => $data['position'] ?? null,
             ':email'             => $data['email'],
             ':password_hash'     => password_hash($data['password'], PASSWORD_BCRYPT, ['cost' => 12]),
             ':role_id'           => $data['role_id'],
@@ -103,7 +151,7 @@ class UserDao
         $fields = [];
         $bind   = [':id' => $id];
 
-        foreach (['full_name','email','contact','capacity_hours','department_id','is_active'] as $col) {
+        foreach (['full_name','position','email','contact','capacity_hours','department_id','is_active'] as $col) {
             if (array_key_exists($col, $data)) {
                 $fields[] = "$col = :$col";
                 $bind[":$col"] = $data[$col];

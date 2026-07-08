@@ -18,6 +18,10 @@ class StudentRequestDao
             $where[] = 'sr.faculty_id = :fid';
             $bind[':fid'] = $filters['faculty_id'];
         }
+        if (!empty($filters['department_id'])) {
+            $where[] = 'sr.department_id = :did';
+            $bind[':did'] = $filters['department_id'];
+        }
         if (!empty($filters['status'])) {
             $where[] = 'sr.status = :status';
             $bind[':status'] = $filters['status'];
@@ -29,10 +33,12 @@ class StudentRequestDao
                     us.enrollment_number AS student_enrollment,
                     us.contact AS student_contact,
                     f.faculty_name,
-                    ua.full_name AS assigned_to_name
+                    dd.dept_name,
+                    ' . UserDao::displayNameSql('ua') . ' AS assigned_to_name
              FROM student_requests sr
              JOIN users us ON us.id = sr.student_id
              JOIN faculties f ON f.id = sr.faculty_id
+             LEFT JOIN departments dd ON dd.id = sr.department_id
              LEFT JOIN users ua ON ua.id = sr.assigned_to
              WHERE ' . implode(' AND ', $where) . '
              ORDER BY sr.created_at DESC'
@@ -48,10 +54,12 @@ class StudentRequestDao
                     us.full_name AS student_name,
                     us.enrollment_number AS student_enrollment,
                     us.contact AS student_contact,
-                    f.faculty_name
+                    f.faculty_name,
+                    dd.dept_name
              FROM student_requests sr
              JOIN users us ON us.id = sr.student_id
              JOIN faculties f ON f.id = sr.faculty_id
+             LEFT JOIN departments dd ON dd.id = sr.department_id
              WHERE sr.id = :id'
         );
         $stmt->execute([':id' => $id]);
@@ -59,14 +67,14 @@ class StudentRequestDao
         return $row ?: null;
     }
 
-    public static function create(int $studentId, int $facultyId, string $title, ?string $description): int
+    public static function create(int $studentId, int $facultyId, string $title, ?string $description, ?int $departmentId = null): int
     {
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'INSERT INTO student_requests (student_id, faculty_id, title, description)
-             VALUES (:sid, :fid, :title, :desc)'
+            'INSERT INTO student_requests (student_id, faculty_id, department_id, title, description)
+             VALUES (:sid, :fid, :did, :title, :desc)'
         );
-        $stmt->execute([':sid' => $studentId, ':fid' => $facultyId, ':title' => $title, ':desc' => $description]);
+        $stmt->execute([':sid' => $studentId, ':fid' => $facultyId, ':did' => $departmentId, ':title' => $title, ':desc' => $description]);
         return (int)$db->lastInsertId();
     }
 

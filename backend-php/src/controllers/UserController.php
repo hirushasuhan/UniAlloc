@@ -65,6 +65,10 @@ class UserController
             if (empty($body[$req])) Response::error("Field '$req' is required", 422);
         }
 
+        if (!empty($body['position']) && !in_array($body['position'], UserDao::POSITIONS, true)) {
+            Response::error('Invalid position value', 422);
+        }
+
         $targetRoleId = (int)$body['role_id'];
 
         if ($auth['role'] === 'department_head') {
@@ -88,7 +92,32 @@ class UserController
             }
         }
 
+        // Rule: a department can only have ONE department head
+        if ($targetRoleId === 3 && !empty($body['department_id'])) {
+            $db  = \App\Helpers\Db::connection();
+            $chk = $db->prepare(
+                "SELECT COUNT(*) AS c
+                 FROM users u
+                 JOIN roles r ON r.id = u.role_id
+                 WHERE u.department_id = :did
+                   AND r.role_name = 'department_head'
+                   AND u.is_active = 1"
+            );
+            $chk->execute([':did' => (int)$body['department_id']]);
+            if ((int)$chk->fetch()['c'] > 0) {
+                Response::error('This department already has a Department Head. A department can only have one head.', 422);
+            }
+        }
+
         $userId = UserDao::create($body);
+
+        // Keep departments.head_id in sync when a Department Head account is created
+        if ($targetRoleId === 3 && !empty($body['department_id'])) {
+            \App\Helpers\Db::connection()
+                ->prepare('UPDATE departments SET head_id = :uid WHERE id = :did')
+                ->execute([':uid' => $userId, ':did' => (int)$body['department_id']]);
+        }
+
         AuditLogDao::log($auth['sub'], 'create_user', 'users', $userId);
         Response::success(['id' => $userId], 'User created', 201);
     }
@@ -102,6 +131,10 @@ class UserController
         // Only admin can update anyone; others can only update themselves
         if ($auth['role'] !== 'system_admin' && $auth['sub'] !== $id) {
             Response::error('Forbidden', 403);
+        }
+
+        if (!empty($body['position']) && !in_array($body['position'], UserDao::POSITIONS, true)) {
+            Response::error('Invalid position value', 422);
         }
 
         $ok = UserDao::update($id, $body);

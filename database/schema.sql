@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS `departments` (
 CREATE TABLE IF NOT EXISTS `users` (
   `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `full_name`         VARCHAR(200) NOT NULL,
+  `position`          VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Academic/professional title, e.g. Senior Prof, Prof, Senior Lecturer, Lecturer, Mr, Ms, Miss, Thero',
   `email`             VARCHAR(200) NOT NULL UNIQUE,
   `password_hash`     VARCHAR(255) NOT NULL,
   `role_id`           TINYINT UNSIGNED NOT NULL,
@@ -185,6 +186,7 @@ CREATE TABLE IF NOT EXISTS `student_requests` (
   `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `student_id`  INT UNSIGNED NOT NULL,
   `faculty_id`  INT UNSIGNED NOT NULL,
+  `department_id` INT UNSIGNED NULL DEFAULT NULL,
   `title`       VARCHAR(300) NOT NULL,
   `description` TEXT NULL,
   `status`      ENUM('pending','assigned','rejected') NOT NULL DEFAULT 'pending',
@@ -195,9 +197,11 @@ CREATE TABLE IF NOT EXISTS `student_requests` (
   PRIMARY KEY (`id`),
   KEY `idx_sreq_student`  (`student_id`),
   KEY `idx_sreq_faculty`  (`faculty_id`),
+  KEY `idx_sreq_department` (`department_id`),
   KEY `idx_sreq_status`   (`status`),
   CONSTRAINT `fk_sreq_student`      FOREIGN KEY (`student_id`)  REFERENCES `users`     (`id`),
   CONSTRAINT `fk_sreq_faculty`      FOREIGN KEY (`faculty_id`)  REFERENCES `faculties` (`id`),
+  CONSTRAINT `fk_sreq_department`   FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_sreq_assigned_to`  FOREIGN KEY (`assigned_to`) REFERENCES `users`     (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_sreq_reviewed_by`  FOREIGN KEY (`reviewed_by`) REFERENCES `users`     (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

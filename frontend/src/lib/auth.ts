@@ -1,6 +1,7 @@
 export interface AuthUser {
   id: number
   full_name: string
+  position?: string | null
   email: string
   role: 'system_admin' | 'dean' | 'department_head' | 'lecturer' | 'student'
   dept_id: number | null

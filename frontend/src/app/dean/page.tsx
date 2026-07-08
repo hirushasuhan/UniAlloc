@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import DashboardBanner from '@/components/ui/DashboardBanner'
@@ -8,6 +9,8 @@ import {
   PieChart, Pie
 } from 'recharts'
 import { HiOutlineClipboardDocumentList, HiOutlineUsers, HiOutlinePaperAirplane, HiOutlineExclamationTriangle, HiOutlineMagnifyingGlass, HiOutlineChevronRight as ChevronRight, HiOutlineEnvelope as Mail, HiOutlinePhone as Phone, HiOutlineBookOpen, HiOutlineClock as Clock, HiOutlineBriefcase, HiOutlineTrophy, HiOutlineSparkles, HiOutlineUserPlus } from 'react-icons/hi2'
+
+const POSITIONS = ['Senior Prof', 'Prof', 'Dr', 'Senior Lecturer', 'Lecturer', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
 
 export default function DeanDashboard() {
   const [assignments, setAssignments] = useState<any[]>([])
@@ -26,6 +29,7 @@ export default function DeanDashboard() {
   // New Staff Management state
   const [newStaffForm, setNewStaffForm] = useState({
     full_name: '',
+    position: '',
     email: '',
     password: '',
     role_id: '4', // Default to Lecturer
@@ -70,6 +74,14 @@ export default function DeanDashboard() {
   // Filter staff members (Department Heads and Lecturers)
   const staffMembers = users.filter(
     u => u.role_name === 'department_head' || u.role_name === 'lecturer'
+  )
+
+  const displayName = (u: any) => u.position ? `${u.position}. ${u.full_name}` : u.full_name
+
+  // Departments that already have a Department Head (a department can only have ONE head)
+  const deptsWithHead = new Set(
+    staffMembers.filter(u => u.role_name === 'department_head' && u.department_id != null)
+                .map(u => u.department_id)
   )
 
   const getStaffWorkload = (userId: number) => {
@@ -141,6 +153,7 @@ export default function DeanDashboard() {
     try {
       await api.post('/users', {
         full_name: newStaffForm.full_name,
+        position: newStaffForm.position || null,
         email: newStaffForm.email,
         password: newStaffForm.password,
         role_id: parseInt(newStaffForm.role_id),
@@ -151,6 +164,7 @@ export default function DeanDashboard() {
       setStaffMsg({ text: 'Staff member created successfully.', ok: true })
       setNewStaffForm({
         full_name: '',
+        position: '',
         email: '',
         password: '',
         role_id: '4',
@@ -290,7 +304,7 @@ export default function DeanDashboard() {
                         <p className="text-xs text-[var(--muted)]">by {r.student_name}</p>
                         {r.status === 'pending' && (
                           <div className="flex gap-2 mt-2">
-                            <button onClick={() => updateStudentReqStatus(r.id, 'approve')} className="text-[10px] font-semibold bg-green-50 text-green-600 px-2 py-1 rounded hover:bg-green-100">Approve</button>
+                            <Link href="/dean/student-requests" className="text-[10px] font-semibold bg-green-50 text-green-600 px-2 py-1 rounded hover:bg-green-100">Review & Assign</Link>
                             <button onClick={() => updateStudentReqStatus(r.id, 'reject')} className="text-[10px] font-semibold bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100">Reject</button>
                           </div>
                         )}
@@ -367,7 +381,7 @@ export default function DeanDashboard() {
                   >
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0">
-                        <h4 className="font-heading font-semibold text-sm truncate">{u.full_name}</h4>
+                        <h4 className="font-heading font-semibold text-sm truncate">{displayName(u)}</h4>
                         <p className="text-xs text-[var(--muted)] mt-0.5 truncate">{u.dept_name ?? 'No Department'}</p>
                       </div>
                       <span className={`badge shrink-0 text-[10px] ${
@@ -432,7 +446,7 @@ export default function DeanDashboard() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="font-heading font-bold text-xl">{selectedLecturer.full_name}</h2>
+                          <h2 className="font-heading font-bold text-xl">{displayName(selectedLecturer)}</h2>
                           <span className={`badge text-xs ${
                             selectedLecturer.role_name === 'department_head'
                               ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
@@ -714,18 +728,33 @@ export default function DeanDashboard() {
             )}
 
             <form onSubmit={handleCreateStaff} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newStaffForm.full_name}
-                  onChange={e => setNewStaffForm(f => ({ ...f, full_name: e.target.value }))}
-                  placeholder="e.g. Dr. Samantha Peiris"
-                  className="input"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newStaffForm.full_name}
+                    onChange={e => setNewStaffForm(f => ({ ...f, full_name: e.target.value }))}
+                    placeholder="e.g. Samantha Peiris"
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">
+                    Position
+                  </label>
+                  <select
+                    value={newStaffForm.position}
+                    onChange={e => setNewStaffForm(f => ({ ...f, position: e.target.value }))}
+                    className="input"
+                  >
+                    <option value="">— None —</option>
+                    {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -861,7 +890,7 @@ export default function DeanDashboard() {
                     return (
                       <tr key={u.id} className="hover:bg-[var(--bg)]/35 transition-colors">
                         <td className="py-3.5 pr-2">
-                          <div className="font-semibold text-sm text-[var(--text)]">{u.full_name}</div>
+                          <div className="font-semibold text-sm text-[var(--text)]">{displayName(u)}</div>
                           <div className="text-xs text-[var(--muted)] mt-0.5">{u.email}</div>
                         </td>
                         <td className="py-3.5 pr-2 text-xs text-[var(--muted)]">{u.dept_name ?? '—'}</td>
@@ -876,18 +905,27 @@ export default function DeanDashboard() {
                         </td>
                         <td className="py-3.5 text-center">
                           {u.role_name === 'lecturer' ? (
-                            <button
-                              disabled={isPromoting || staffSaving}
-                              onClick={() => handlePromoteStaff(u.id, u.role_name)}
-                              className="btn-secondary text-[11px] py-1.5 px-2.5 rounded-lg border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 active:scale-95 inline-flex items-center gap-1.5"
-                            >
-                              {isPromoting ? (
-                                <span className="w-3 h-3 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin shrink-0" />
-                              ) : (
-                                <HiOutlineTrophy size={13} />
-                              )}
-                              Promote
-                            </button>
+                            deptsWithHead.has(u.department_id) ? (
+                              <span
+                                className="text-xs text-[var(--muted)] font-medium cursor-not-allowed"
+                                title="This department already has a Department Head. A department can only have one head."
+                              >
+                                Dept head exists
+                              </span>
+                            ) : (
+                              <button
+                                disabled={isPromoting || staffSaving}
+                                onClick={() => handlePromoteStaff(u.id, u.role_name)}
+                                className="btn-secondary text-[11px] py-1.5 px-2.5 rounded-lg border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 active:scale-95 inline-flex items-center gap-1.5"
+                              >
+                                {isPromoting ? (
+                                  <span className="w-3 h-3 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin shrink-0" />
+                                ) : (
+                                  <HiOutlineTrophy size={13} />
+                                )}
+                                Promote
+                              </button>
+                            )
                           ) : (
                             <span className="text-xs text-[var(--muted)] font-medium">Head of Dept</span>
                           )}

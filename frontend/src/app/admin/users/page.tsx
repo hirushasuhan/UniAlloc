@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineUserPlus, HiOutlineUserMinus, HiOutlineXMark, HiOutlineKey } from 'react-icons/hi2'
 
 const ROLES = ['system_admin','dean','department_head','lecturer','student']
+const POSITIONS = ['Senior Prof', 'Prof', 'Dr', 'Senior Lecturer', 'Lecturer', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
 
 export default function AdminUsersPage() {
   const [users,   setUsers]   = useState<any[]>([])
@@ -20,7 +21,7 @@ export default function AdminUsersPage() {
   const [selectedFaculty, setSelectedFaculty] = useState<string>('')
 
   const [form, setForm] = useState({
-    full_name:'', email:'', password:'', role_id:'4',
+    full_name:'', position:'', email:'', password:'', role_id:'4',
     department_id:'', contact:'', capacity_hours:'40'
   })
 
@@ -55,13 +56,14 @@ export default function AdminUsersPage() {
     try {
       await api.post('/users', {
         ...form,
+        position:       form.position || null,
         role_id:        parseInt(form.role_id),
         department_id:  form.department_id ? parseInt(form.department_id) : null,
         capacity_hours: parseFloat(form.capacity_hours),
       })
       setMsg({ text: 'User created successfully.', ok: true })
       setShowModal(false)
-      setForm({ full_name:'', email:'', password:'', role_id:'4', department_id:'', contact:'', capacity_hours:'40' })
+      setForm({ full_name:'', position:'', email:'', password:'', role_id:'4', department_id:'', contact:'', capacity_hours:'40' })
       setSelectedFaculty('')
       load()
     } catch(err:any) {
@@ -72,6 +74,15 @@ export default function AdminUsersPage() {
   async function toggleActive(id:number, current:number) {
     await api.put(`/users/${id}`, { is_active: current ? 0 : 1 })
     load()
+  }
+
+  async function updatePosition(id:number, position:string) {
+    try {
+      await api.put(`/users/${id}`, { position: position || null })
+      load()
+    } catch(err:any) {
+      setMsg({ text: err.response?.data?.message ?? 'Failed to update position.', ok: false })
+    }
   }
 
   async function resetPassword(id: number) {
@@ -133,7 +144,7 @@ export default function AdminUsersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)]">
-              {['Name','Email','Role','Department','Capacity (h)','Status','Actions'].map(h=>(
+              {['Name','Position','Email','Role','Department','Capacity (h)','Status','Actions'].map(h=>(
                 <th key={h} className="text-left py-3 px-4 text-[var(--muted)] font-medium">{h}</th>
               ))}
             </tr>
@@ -141,7 +152,17 @@ export default function AdminUsersPage() {
           <tbody>
             {filtered.map((u:any) => (
               <tr key={u.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--bg)]/50">
-                <td className="py-3 px-4 font-medium">{u.full_name}</td>
+                <td className="py-3 px-4 font-medium">{u.position ? `${u.position}. ` : ''}{u.full_name}</td>
+                <td className="py-3 px-4">
+                  <select
+                    value={u.position ?? ''}
+                    onChange={e => updatePosition(u.id, e.target.value)}
+                    className="input py-1 px-2 text-xs max-w-[140px]"
+                  >
+                    <option value="">— None —</option>
+                    {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </td>
                 <td className="py-3 px-4 text-[var(--muted)]">{u.email}</td>
                 <td className="py-3 px-4">
                   <span className={`badge ${roleColor[u.role_name] ?? 'bg-slate-100 text-slate-700'}`}>
@@ -169,7 +190,7 @@ export default function AdminUsersPage() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="py-8 text-center text-[var(--muted)]">No users found.</td></tr>
+              <tr><td colSpan={8} className="py-8 text-center text-[var(--muted)]">No users found.</td></tr>
             )}
           </tbody>
         </table>
@@ -185,9 +206,16 @@ export default function AdminUsersPage() {
             <h2 className="font-heading font-semibold text-lg mb-5">Create New User</h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+                <div className="col-span-2 md:col-span-1">
                   <label className="block text-sm font-medium mb-1">Full Name *</label>
-                  <input value={form.full_name} onChange={e=>setForm(f=>({...f,full_name:e.target.value}))} className="input" required placeholder="Dr. John Smith"/>
+                  <input value={form.full_name} onChange={e=>setForm(f=>({...f,full_name:e.target.value}))} className="input" required placeholder="John Smith"/>
+                </div>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-sm font-medium mb-1">Position</label>
+                  <select value={form.position} onChange={e=>setForm(f=>({...f,position:e.target.value}))} className="input">
+                    <option value="">— None —</option>
+                    {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">Email *</label>

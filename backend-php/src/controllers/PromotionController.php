@@ -32,6 +32,27 @@ class PromotionController
         $newRoleId = UserDao::roleIdByName($body['new_role']);
         if (!$newRoleId) Response::error('Invalid role name', 422);
 
+        // Rule: a department can only have ONE department head
+        if ($body['new_role'] === 'department_head') {
+            if (empty($user['department_id'])) {
+                Response::error('This user must belong to a department before becoming its head.', 422);
+            }
+            $db  = \App\Helpers\Db::connection();
+            $chk = $db->prepare(
+                "SELECT COUNT(*) AS c
+                 FROM users u
+                 JOIN roles r ON r.id = u.role_id
+                 WHERE u.department_id = :did
+                   AND r.role_name = 'department_head'
+                   AND u.is_active = 1
+                   AND u.id != :uid"
+            );
+            $chk->execute([':did' => (int)$user['department_id'], ':uid' => (int)$body['user_id']]);
+            if ((int)$chk->fetch()['c'] > 0) {
+                Response::error('This department already has a Department Head. A department can only have one head.', 422);
+            }
+        }
+
         $id = PromotionDao::create((int)$body['user_id'], $oldRoleId, $newRoleId, $auth['sub']);
 
         // Dean can directly promote lecturer→dept_head without admin approval

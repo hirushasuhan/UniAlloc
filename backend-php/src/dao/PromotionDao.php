@@ -8,9 +8,9 @@ class PromotionDao
     public static function list(): array
     {
         $stmt = Db::connection()->query(
-            'SELECT rp.*, u.full_name AS user_name,
+            'SELECT rp.*, ' . UserDao::displayNameSql('u') . ' AS user_name,
                     r1.role_name AS old_role, r2.role_name AS new_role,
-                    pb.full_name AS promoted_by_name
+                    ' . UserDao::displayNameSql('pb') . ' AS promoted_by_name
              FROM role_promotions rp
              JOIN users u ON u.id = rp.user_id
              JOIN roles r1 ON r1.id = rp.old_role_id
@@ -63,6 +63,10 @@ class PromotionDao
                 $db->prepare('UPDATE departments SET head_id = :uid WHERE id = :did')
                    ->execute([':uid' => $p['user_id'], ':did' => $userRow['department_id']]);
             }
+        } else {
+            // Demoted from department head → clear any department still pointing to them
+            $db->prepare('UPDATE departments SET head_id = NULL WHERE head_id = :uid')
+               ->execute([':uid' => $p['user_id']]);
         }
 
         return true;

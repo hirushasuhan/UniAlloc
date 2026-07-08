@@ -284,7 +284,7 @@ export default function DeanRequestsPage() {
                     <option value="">— Select person —</option>
                     {users.map((u: any) => (
                       <option key={u.id} value={u.id}>
-                        {u.full_name} ({u.role_name?.replace('_', ' ')})
+                        {u.position ? `${u.position}. ` : ''}{u.full_name} ({u.role_name?.replace('_', ' ')})
                       </option>
                     ))}
                   </select>

@@ -106,7 +106,7 @@ export default function AdminPromotionsPage() {
             <tbody>
               {nonStudents.map((u: any) => (
                 <tr key={u.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--bg)]/50 transition-colors">
-                  <td className="py-3.5 px-4 font-semibold">{u.full_name}</td>
+                  <td className="py-3.5 px-4 font-semibold">{u.position ? `${u.position}. ` : ''}{u.full_name}</td>
                   <td className="py-3.5 px-4 text-[var(--muted)]">{u.email}</td>
                   <td className="py-3.5 px-4 text-[var(--muted)]">{u.dept_name ?? '—'}</td>
                   <td className="py-3.5 px-4">

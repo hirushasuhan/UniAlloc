@@ -72,6 +72,11 @@ class AssignmentController
             if (empty($body[$req])) Response::error("Field '$req' is required", 422);
         }
 
+        // Deadline cannot be a past date
+        if (!empty($body['deadline']) && $body['deadline'] < date('Y-m-d')) {
+            Response::error('Deadline cannot be a past date.', 422);
+        }
+
         $assigneeId = (int)$body['assigned_to'];
         $assignee = UserDao::findById($assigneeId);
         if (!$assignee) {
@@ -124,6 +129,11 @@ class AssignmentController
         
         $a = AssignmentDao::findById($id);
         if (!$a) Response::error('Assignment not found', 404);
+
+        // Deadline cannot be moved to a past date
+        if (!empty($body['deadline']) && $body['deadline'] < date('Y-m-d')) {
+            Response::error('Deadline cannot be a past date.', 422);
+        }
 
         $ok = AssignmentDao::update($id, $body);
 

@@ -14,8 +14,11 @@ class WorkloadService
     {
         $db = Db::connection();
 
-        // Get user's capacity
-        $stmt = $db->prepare("SELECT capacity_hours, full_name FROM users WHERE id = :uid");
+        // Get user's capacity (full_name is prefixed with the academic position, e.g. "Dr. …")
+        $stmt = $db->prepare(
+            'SELECT capacity_hours, ' . \App\Dao\UserDao::displayNameSql('users') . ' AS full_name
+             FROM users WHERE id = :uid'
+        );
         $stmt->execute([':uid' => $userId]);
         $user = $stmt->fetch();
 
@@ -72,13 +75,15 @@ class WorkloadService
 
         // Notify their Department Head
         $db   = Db::connection();
-        $stmt = $db->prepare(
-            'SELECT d.head_id FROM users u JOIN departments d ON d.id = u.department_id WHERE u.id = :uid'
-        );
+        $stmt = $db->prepare('SELECT department_id FROM users WHERE id = :uid');
         $stmt->execute([':uid' => $assignedToUserId]);
         $row = $stmt->fetch();
-        if ($row && $row['head_id']) {
-            NotificationDao::create((int)$row['head_id'], $msg, 'overload');
+        $headId = ($row && $row['department_id'])
+            ? \App\Dao\UserDao::departmentHeadId((int)$row['department_id'])
+            : null;
+        // Don't notify the head about their own overload twice (they already got the direct one)
+        if ($headId && $headId !== $assignedToUserId) {
+            NotificationDao::create($headId, $msg, 'overload');
         }
     }
 
@@ -96,7 +101,7 @@ class WorkloadService
         $deptId = (int)$row['department_id'];
 
         $stmt2 = $db->prepare(
-            "SELECT u.id, u.full_name, u.capacity_hours,
+            "SELECT u.id, " . \App\Dao\UserDao::displayNameSql('u') . " AS full_name, u.capacity_hours,
                     COALESCE(SUM(a.estimated_hours),0) AS allocated_hours
              FROM users u
              LEFT JOIN assignments a ON a.assigned_to = u.id AND a.status IN ('pending','in_progress')

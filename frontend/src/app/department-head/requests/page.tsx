@@ -251,7 +251,7 @@ export default function DeptHeadRequestsPage() {
                         <option value="">— Select person —</option>
                         {users.map((u: any) => (
                           <option key={u.id} value={u.id}>
-                            {u.full_name} ({u.role_name?.replace('_', ' ')})
+                            {u.position ? `${u.position}. ` : ''}{u.full_name} ({u.role_name?.replace('_', ' ')})
                           </option>
                         ))}
                       </select>
@@ -269,7 +269,7 @@ export default function DeptHeadRequestsPage() {
                     <option value="">— Select lecturer —</option>
                     {users.map((u: any) => (
                       <option key={u.id} value={u.id}>
-                        {u.full_name} ({u.dept_name ?? 'dept ' + u.department_id})
+                        {u.position ? `${u.position}. ` : ''}{u.full_name} ({u.dept_name ?? 'dept ' + u.department_id})
                       </option>
                     ))}
                   </select>

@@ -49,11 +49,14 @@ class AppealController
 
         // Notify dept head
         $db   = \App\Helpers\Db::connection();
-        $stmt = $db->prepare('SELECT d.head_id FROM users u JOIN departments d ON d.id = u.department_id WHERE u.id = :uid');
+        $stmt = $db->prepare('SELECT department_id FROM users WHERE id = :uid');
         $stmt->execute([':uid' => $auth['sub']]);
         $row  = $stmt->fetch();
-        if ($row && $row['head_id']) {
-            NotificationDao::create((int)$row['head_id'], 'A lecturer has submitted a workload appeal.', 'appeal');
+        $headId = ($row && $row['department_id'])
+            ? \App\Dao\UserDao::departmentHeadId((int)$row['department_id'])
+            : null;
+        if ($headId) {
+            NotificationDao::create($headId, 'A lecturer has submitted a workload appeal.', 'appeal');
         }
 
         Response::success(['id' => $id], 'Appeal submitted', 201);

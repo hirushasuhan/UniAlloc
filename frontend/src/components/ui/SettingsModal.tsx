@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { HiOutlineXMark, HiOutlineKey, HiOutlineArrowRightOnRectangle } from 'react-icons/hi2'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 
+const POSITIONS = ['Senior Prof', 'Prof', 'Dr', 'Senior Lecturer', 'Lecturer', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
+
 interface Props {
   user: AuthUser
   onClose: () => void
@@ -16,6 +18,7 @@ interface Props {
 export default function SettingsModal({ user, onClose, onChangePasswordClick, onUpdateUser }: Props) {
   const [form, setForm] = useState({
     full_name: user.full_name,
+    position: user.position ?? '',
     email: user.email,
     contact: user.contact ?? ''
   })
@@ -38,9 +41,10 @@ export default function SettingsModal({ user, onClose, onChangePasswordClick, on
     setSuccess('')
 
     try {
-      await api.put(`/users/${user.id}`, form)
-      
-      const updatedUser = { ...user, ...form }
+      const payload = { ...form, position: form.position || null }
+      await api.put(`/users/${user.id}`, payload)
+
+      const updatedUser = { ...user, ...payload }
       
       // Update local storage via saveAuth
       const token = getToken()
@@ -81,6 +85,18 @@ export default function SettingsModal({ user, onClose, onChangePasswordClick, on
             {success && <div className="mb-4 text-sm text-green-500 bg-green-500/10 rounded-xl px-3 py-2 border border-green-500/20">{success}</div>}
             
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Position</label>
+                <select
+                  value={form.position}
+                  onChange={e => f('position', e.target.value)}
+                  className="input disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!isEditing}
+                >
+                  <option value="">— None —</option>
+                  {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Full Name *</label>
                 <input 
@@ -141,7 +157,7 @@ export default function SettingsModal({ user, onClose, onChangePasswordClick, on
                     type="button" 
                     onClick={() => {
                       setIsEditing(false)
-                      setForm({ full_name: user.full_name, email: user.email, contact: user.contact ?? '' })
+                      setForm({ full_name: user.full_name, position: user.position ?? '', email: user.email, contact: user.contact ?? '' })
                     }}
                     disabled={saving}
                     className="btn-secondary flex-1 justify-center"

@@ -41,8 +41,8 @@ class AssignmentDao
         }
 
         $sql = 'SELECT a.*,
-                       ut.full_name AS assigned_to_name,
-                       ub.full_name AS assigned_by_name,
+                       ' . UserDao::displayNameSql('ut') . ' AS assigned_to_name,
+                       ' . UserDao::displayNameSql('ub') . ' AS assigned_by_name,
                        d.dept_name,
                        (SELECT MAX(ap.progress_percent) FROM assignment_progress ap WHERE ap.assignment_id = a.id) AS latest_progress
                 FROM assignments a
@@ -61,8 +61,8 @@ class AssignmentDao
     {
         $stmt = Db::connection()->prepare(
             'SELECT a.*,
-                    ut.full_name AS assigned_to_name,
-                    ub.full_name AS assigned_by_name,
+                    ' . UserDao::displayNameSql('ut') . ' AS assigned_to_name,
+                    ' . UserDao::displayNameSql('ub') . ' AS assigned_by_name,
                     d.dept_name
              FROM assignments a
              JOIN users ut ON ut.id = a.assigned_to
@@ -135,7 +135,7 @@ class AssignmentDao
     public static function getProgress(int $assignmentId): array
     {
         $stmt = Db::connection()->prepare(
-            'SELECT ap.*, u.full_name AS updated_by_name
+            'SELECT ap.*, ' . UserDao::displayNameSql('u') . ' AS updated_by_name
              FROM assignment_progress ap
              JOIN users u ON u.id = ap.updated_by
              WHERE ap.assignment_id = :aid

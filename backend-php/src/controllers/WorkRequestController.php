@@ -35,8 +35,8 @@ class WorkRequestController
                 // Admin sees all — special case, no filter → skip DAO and return all
                 $stmt = Db::connection()->prepare(
                     'SELECT wr.*,
-                            ur.full_name   AS requester_name,
-                            ut.full_name   AS target_user_name,
+                            ' . UserDao::displayNameSql('ur') . ' AS requester_name,
+                            ' . UserDao::displayNameSql('ut') . ' AS target_user_name,
                             d.dept_name    AS target_dept_name,
                             f.faculty_name AS target_faculty_name
                      FROM work_requests wr
@@ -330,14 +330,10 @@ class WorkRequestController
                 );
             }
         } elseif ($step === 'pending_dept_head' && !empty($data['target_dept_id'])) {
-            $stmt = Db::connection()->prepare(
-                'SELECT head_id FROM departments WHERE id = :did'
-            );
-            $stmt->execute([':did' => $data['target_dept_id']]);
-            $row = $stmt->fetch();
-            if ($row && $row['head_id']) {
+            $headId = UserDao::departmentHeadId((int)$data['target_dept_id']);
+            if ($headId) {
                 NotificationDao::create(
-                    (int)$row['head_id'],
+                    $headId,
                     "New work request \"{$data['title']}\" requires your department's approval.",
                     'request'
                 );
@@ -354,13 +350,12 @@ class WorkRequestController
     private function getDeptHeadForUser(int $userId): ?int
     {
         $stmt = Db::connection()->prepare(
-            'SELECT d.head_id FROM users u
-             JOIN departments d ON d.id = u.department_id
-             WHERE u.id = :uid'
+            'SELECT department_id FROM users WHERE id = :uid'
         );
         $stmt->execute([':uid' => $userId]);
         $row = $stmt->fetch();
-        return $row && $row['head_id'] ? (int)$row['head_id'] : null;
+        if (!$row || !$row['department_id']) return null;
+        return UserDao::departmentHeadId((int)$row['department_id']);
     }
 
     private function resolveUpwardTarget(array $auth): ?int

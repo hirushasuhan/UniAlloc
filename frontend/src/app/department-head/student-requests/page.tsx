@@ -4,7 +4,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import { HiOutlineXMark } from 'react-icons/hi2'
 
-export default function DeanStudentRequestsPage() {
+export default function DeptHeadStudentRequestsPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [users,    setUsers]    = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
@@ -30,11 +30,8 @@ export default function DeanStudentRequestsPage() {
     api.get('/users').then(r => setUsers(r.data.data ?? []))
   }, [])
 
-  // Supervisors from the request's target department (all faculty staff if no department set)
-  const assignable = users.filter(u =>
-    ['lecturer','department_head'].includes(u.role_name) &&
-    (!selected?.department_id || u.department_id === selected.department_id)
-  )
+  // /users is already scoped to the department for dept heads
+  const assignable = users.filter(u => ['lecturer','department_head'].includes(u.role_name))
 
   async function handleResolve(status: 'assigned'|'rejected') {
     if (!selected) return
@@ -58,9 +55,9 @@ export default function DeanStudentRequestsPage() {
   }
 
   return (
-    <DashboardLayout requiredRole="dean">
+    <DashboardLayout requiredRole="department_head">
       <h1 className="text-2xl font-heading font-bold mb-2">Student Supervisor Requests</h1>
-      <p className="text-[var(--muted)] text-sm mb-6">Review and assign supervisors to students in your faculty</p>
+      <p className="text-[var(--muted)] text-sm mb-6">Review and assign supervisors to students requesting your department</p>
 
       {msg && (
         <div className={`mb-4 rounded-xl px-4 py-3 text-sm ${msg.ok?'bg-green-500/10 border border-green-500/30 text-green-600':'bg-red-500/10 border border-red-500/30 text-red-500'}`}>
@@ -71,7 +68,7 @@ export default function DeanStudentRequestsPage() {
       <div className="glass-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-[var(--border)]">
-            {['Student','Title','Department','Description','Status','Supervisor','Action'].map(h=>(
+            {['Student','Title','Description','Status','Supervisor','Action'].map(h=>(
               <th key={h} className="text-left py-3 px-4 text-[var(--muted)] font-medium">{h}</th>
             ))}
           </tr></thead>
@@ -80,7 +77,6 @@ export default function DeanStudentRequestsPage() {
               <tr key={r.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--bg)]/50">
                 <td className="py-3 px-4 font-medium">{r.student_name}</td>
                 <td className="py-3 px-4 max-w-[180px] truncate font-medium">{r.title}</td>
-                <td className="py-3 px-4 text-[var(--muted)]">{r.dept_name ?? '—'}</td>
                 <td className="py-3 px-4 text-[var(--muted)] max-w-[200px] truncate">{r.description ?? '—'}</td>
                 <td className="py-3 px-4"><span className={`badge ${STATUS_COLOR[r.status]}`}>{r.status}</span></td>
                 <td className="py-3 px-4 text-[var(--muted)]">{r.assigned_to_name ?? '—'}</td>
@@ -95,7 +91,7 @@ export default function DeanStudentRequestsPage() {
               </tr>
             ))}
             {requests.length === 0 && (
-              <tr><td colSpan={7} className="py-8 text-center text-[var(--muted)]">No student requests.</td></tr>
+              <tr><td colSpan={6} className="py-8 text-center text-[var(--muted)]">No student requests for your department.</td></tr>
             )}
           </tbody>
         </table>
@@ -111,7 +107,6 @@ export default function DeanStudentRequestsPage() {
               <p>Student Name: <strong className="text-white">{selected.student_name}</strong></p>
               <p>Enrollment No: <strong className="text-white">{selected.student_enrollment ?? '—'}</strong></p>
               <p>Contact No: <strong className="text-white">{selected.student_contact ?? '—'}</strong></p>
-              <p>Requested Department: <strong className="text-white">{selected.dept_name ?? '—'}</strong></p>
             </div>
             <p className="font-semibold mb-1">{selected.title}</p>
             {selected.description && <p className="text-sm text-[var(--muted)] mb-4">{selected.description}</p>}

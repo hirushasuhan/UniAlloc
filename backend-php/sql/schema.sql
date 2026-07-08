@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS `departments` (
 CREATE TABLE IF NOT EXISTS `users` (
   `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `full_name`         VARCHAR(200) NOT NULL,
+  `position`          VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Academic/professional title, e.g. Senior Prof, Prof, Senior Lecturer, Lecturer, Mr, Ms, Miss, Thero',
   `email`             VARCHAR(200) NOT NULL UNIQUE,
   `password_hash`     VARCHAR(255) NOT NULL,
   `role_id`           TINYINT UNSIGNED NOT NULL,

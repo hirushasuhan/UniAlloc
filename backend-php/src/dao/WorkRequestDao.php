@@ -12,13 +12,13 @@ class WorkRequestDao
     {
         return '
             SELECT wr.*,
-                   ur.full_name    AS requester_name,
-                   ut.full_name    AS target_user_name,
+                   ' . UserDao::displayNameSql('ur') . '  AS requester_name,
+                   ' . UserDao::displayNameSql('ut') . '  AS target_user_name,
                    ut.role_id      AS target_user_role_id,
                    d.dept_name     AS target_dept_name,
                    f.faculty_name  AS target_faculty_name,
-                   da.full_name    AS dean_approver_name,
-                   dha.full_name   AS dept_head_approver_name
+                   ' . UserDao::displayNameSql('da') . '  AS dean_approver_name,
+                   ' . UserDao::displayNameSql('dha') . ' AS dept_head_approver_name
             FROM work_requests wr
             JOIN  users ur  ON ur.id  = wr.requester_id
             LEFT JOIN users ut  ON ut.id  = wr.target_user_id
