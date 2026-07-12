@@ -137,6 +137,34 @@ class AssignmentController
 
         $ok = AssignmentDao::update($id, $body);
 
+        // Notify the lecturer about remedial changes (e.g. after an appeal review)
+        if ($ok) {
+            $changes = [];
+            if (isset($body['priority']) && $body['priority'] !== $a['priority']) {
+                $changes[] = "priority changed to '{$body['priority']}'";
+            }
+            if (array_key_exists('deadline', $body) && $body['deadline'] !== $a['deadline']) {
+                $changes[] = 'deadline ' . ($body['deadline'] ? "extended to {$body['deadline']}" : 'removed');
+            }
+            if (isset($body['estimated_hours']) && (float)$body['estimated_hours'] !== (float)$a['estimated_hours']) {
+                $changes[] = "estimated hours changed to {$body['estimated_hours']}h";
+            }
+            if ($changes) {
+                NotificationDao::create(
+                    (int)$a['assigned_to'],
+                    "Your task \"{$a['title']}\" was updated: " . implode(', ', $changes) . '.',
+                    'assignment'
+                );
+            }
+            if (isset($body['status']) && $body['status'] === 'cancelled' && $a['status'] !== 'cancelled') {
+                NotificationDao::create(
+                    (int)$a['assigned_to'],
+                    "Your task \"{$a['title']}\" has been removed from your workload.",
+                    'assignment'
+                );
+            }
+        }
+
         // Notify if approved
         if (isset($body['status']) && $body['status'] === 'completed' && $a['status'] === 'review_pending') {
             NotificationDao::create(

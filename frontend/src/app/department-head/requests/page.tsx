@@ -31,6 +31,7 @@ export default function DeptHeadRequestsPage() {
   const [form, setForm] = useState({
     request_type:      'cross_department',
     target_faculty_id: '',
+    target_dept_id:    '',
     target_user_id:    '',
     title:             '',
     description:       '',
@@ -44,21 +45,33 @@ export default function DeptHeadRequestsPage() {
     api.get('/departments').then(r => setDepts(r.data.data ?? []))
   }, [])
 
-  // Load users when a faculty is selected (for cross-faculty) or for upward
+  // My faculty id — from session, with a fallback via my department record
+  const myFacultyId = user?.faculty_id ?? depts.find((d: any) => d.id === user?.dept_id)?.faculty_id
+
+  // Other faculties (cross-faculty can never target my own faculty)
+  const otherFaculties = faculties.filter((f: any) => f.id !== myFacultyId)
+
+  // Other departments in MY faculty (cross-department can never target my own dept)
+  const otherDepts = depts.filter((d: any) => d.faculty_id === myFacultyId && d.id !== user?.dept_id)
+
+  // Load target users based on the selected faculty (cross-faculty)
+  // or the selected department (cross-department). Self is always excluded.
   useEffect(() => {
     if (form.request_type === 'cross_faculty' && form.target_faculty_id) {
       api.get(`/users?faculty_id=${form.target_faculty_id}`)
-        .then(r => setUsers(r.data.data ?? []))
+        .then(r => setUsers((r.data.data ?? []).filter((u: any) => u.id !== user?.id)))
         .catch(() => setUsers([]))
-    } else if (form.request_type === 'cross_department') {
-      // Show lecturers from other departments in the SAME faculty
-      api.get(`/users?role=lecturer&faculty_id=${user?.faculty_id ?? ''}`)
-        .then(r => setUsers((r.data.data ?? []).filter((u: any) => u.department_id !== user?.dept_id)))
+    } else if (form.request_type === 'cross_department' && form.target_dept_id) {
+      // Lecturers AND the department head of the selected department
+      api.get(`/users?dept_id=${form.target_dept_id}`)
+        .then(r => setUsers((r.data.data ?? []).filter((u: any) =>
+          u.id !== user?.id && ['lecturer', 'department_head'].includes(u.role_name)
+        )))
         .catch(() => setUsers([]))
     } else {
       setUsers([])
     }
-  }, [form.request_type, form.target_faculty_id])
+  }, [form.request_type, form.target_faculty_id, form.target_dept_id])
 
   async function act(id: number, action: 'approve' | 'accept' | 'reject') {
     try {
@@ -86,7 +99,7 @@ export default function DeptHeadRequestsPage() {
       })
       setMsg({ text: 'Request submitted.', ok: true })
       setShowModal(false)
-      setForm({ request_type: 'cross_department', target_faculty_id: '', target_user_id: '', title: '', description: '' })
+      setForm({ request_type: 'cross_department', target_faculty_id: '', target_dept_id: '', target_user_id: '', title: '', description: '' })
       load()
     } catch (e: any) {
       setMsg({ text: e.response?.data?.message ?? 'Error', ok: false })
@@ -221,7 +234,7 @@ export default function DeptHeadRequestsPage() {
               <div>
                 <label className="block text-sm font-medium mb-1">Request Type</label>
                 <select value={form.request_type}
-                  onChange={e => setForm(f => ({ ...f, request_type: e.target.value, target_faculty_id: '', target_user_id: '' }))}
+                  onChange={e => setForm(f => ({ ...f, request_type: e.target.value, target_faculty_id: '', target_dept_id: '', target_user_id: '' }))}
                   className="input">
                   <option value="cross_department">Cross-Department (request lecturer from another dept)</option>
                   <option value="cross_faculty">Cross-Faculty (request person from another faculty)</option>
@@ -237,10 +250,11 @@ export default function DeptHeadRequestsPage() {
                       onChange={e => setForm(f => ({ ...f, target_faculty_id: e.target.value, target_user_id: '' }))}
                       className="input" required>
                       <option value="">— Select faculty —</option>
-                      {faculties.map((f: any) => (
+                      {otherFaculties.map((f: any) => (
                         <option key={f.id} value={f.id}>{f.faculty_name}</option>
                       ))}
                     </select>
+                    <p className="text-[10px] text-[var(--muted)] mt-1">Your own faculty is not listed — use a cross-department request for that.</p>
                   </div>
                   {form.target_faculty_id && (
                     <div>
@@ -261,19 +275,38 @@ export default function DeptHeadRequestsPage() {
               )}
 
               {form.request_type === 'cross_department' && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Target Lecturer</label>
-                  <select value={form.target_user_id}
-                    onChange={e => setForm(f => ({ ...f, target_user_id: e.target.value }))}
-                    className="input" required>
-                    <option value="">— Select lecturer —</option>
-                    {users.map((u: any) => (
-                      <option key={u.id} value={u.id}>
-                        {u.position ? `${u.position}. ` : ''}{u.full_name} ({u.dept_name ?? 'dept ' + u.department_id})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Target Department</label>
+                    <select value={form.target_dept_id}
+                      onChange={e => setForm(f => ({ ...f, target_dept_id: e.target.value, target_user_id: '' }))}
+                      className="input" required>
+                      <option value="">— Select department —</option>
+                      {otherDepts.map((d: any) => (
+                        <option key={d.id} value={d.id}>{d.dept_name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-[var(--muted)] mt-1">Your own department is not listed — assign that work directly from Assignments.</p>
+                  </div>
+                  {form.target_dept_id && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Target Staff Member</label>
+                      <select value={form.target_user_id}
+                        onChange={e => setForm(f => ({ ...f, target_user_id: e.target.value }))}
+                        className="input" required>
+                        <option value="">— Select staff member —</option>
+                        {users.map((u: any) => (
+                          <option key={u.id} value={u.id}>
+                            {u.position ? `${u.position}. ` : ''}{u.full_name} ({u.role_name === 'department_head' ? 'Dept Head' : 'Lecturer'})
+                          </option>
+                        ))}
+                      </select>
+                      {users.length === 0 && (
+                        <p className="text-[10px] text-amber-500 mt-1 font-semibold">⚠ No staff found in this department.</p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
 
               <div>

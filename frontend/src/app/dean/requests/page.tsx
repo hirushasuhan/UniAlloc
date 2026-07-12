@@ -42,11 +42,14 @@ export default function DeanRequestsPage() {
     api.get('/faculties').then(r => setFaculties(r.data.data ?? []))
   }, [])
 
-  // When a target faculty is selected, load their users
+  // Cross-faculty requests can never target the dean's own faculty or themselves
+  const otherFaculties = faculties.filter((f: any) => f.id !== user?.faculty_id)
+
+  // When a target faculty is selected, load their users (excluding self)
   useEffect(() => {
     if (form.target_faculty_id) {
       api.get(`/users?faculty_id=${form.target_faculty_id}`)
-        .then(r => setUsers(r.data.data ?? []))
+        .then(r => setUsers((r.data.data ?? []).filter((u: any) => u.id !== user?.id)))
         .catch(() => setUsers([]))
     } else {
       setUsers([])
@@ -269,10 +272,11 @@ export default function DeanRequestsPage() {
                   onChange={e => setForm(f => ({ ...f, target_faculty_id: e.target.value, target_user_id: '' }))}
                   className="input" required>
                   <option value="">— Select faculty —</option>
-                  {faculties.map((f: any) => (
+                  {otherFaculties.map((f: any) => (
                     <option key={f.id} value={f.id}>{f.faculty_name}</option>
                   ))}
                 </select>
+                <p className="text-[10px] text-[var(--muted)] mt-1">Your own faculty is not listed — assign work within your faculty directly from Assignments.</p>
               </div>
 
               {form.target_faculty_id && (

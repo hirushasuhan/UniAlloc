@@ -152,6 +152,19 @@ class WorkRequestController
             if ($row) $targetFacultyId = (int)$row['id'];
         }
 
+        // ---- Validation: no self / own-scope targeting ------------------
+        if ($targetUserId === (int)$auth['sub']) {
+            Response::error('You cannot send a work request to yourself.', 422);
+        }
+        if ($requestType === 'cross_faculty' && $targetFacultyId
+            && (int)($auth['faculty'] ?? 0) === $targetFacultyId) {
+            Response::error('Cross-faculty requests cannot target your own faculty. Use a cross-department request or assign the work directly.', 422);
+        }
+        if ($requestType === 'cross_department' && $targetDeptId
+            && (int)($auth['dept'] ?? 0) === $targetDeptId) {
+            Response::error('Cross-department requests cannot target your own department. Assign the work directly instead.', 422);
+        }
+
         // Determine initial approval step
         $approvalStep = $this->determineInitialStep($requestType, $targetRoleName);
 
