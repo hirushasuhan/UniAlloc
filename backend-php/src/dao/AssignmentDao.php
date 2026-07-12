@@ -27,9 +27,11 @@ class AssignmentDao
             $bind[':faculty_id'] = $filters['faculty_id'];
         }
         if (!empty($filters['dean_scope_faculty_id'])) {
-            $where[] = '(d.faculty_id = :dean_scope_faculty_id OR a.assigned_by = :dean_scope_user_id)';
+            // Faculty's own assignments, OR ones the dean created, OR ones assigned TO the dean themselves
+            $where[] = '(d.faculty_id = :dean_scope_faculty_id OR a.assigned_by = :dean_scope_user_id OR a.assigned_to = :dean_scope_user_id2)';
             $bind[':dean_scope_faculty_id'] = $filters['dean_scope_faculty_id'];
             $bind[':dean_scope_user_id'] = $filters['dean_scope_user_id'];
+            $bind[':dean_scope_user_id2'] = $filters['dean_scope_user_id'];
         }
         if (!empty($filters['status'])) {
             $where[] = 'a.status = :status';

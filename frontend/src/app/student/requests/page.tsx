@@ -52,7 +52,7 @@ export default function StudentRequestsPage() {
         enrollment_number: enrollment,
         contact,
         faculty_id: parseInt(facultyId),
-        department_id: parseInt(deptId)
+        department_id: deptId ? parseInt(deptId) : null
       })
       setMsg({ text: 'Request submitted successfully! The Dean and the Department Head will review it shortly.', ok: true })
       setTitle(''); setDesc(''); setFacultyId(''); setDeptId('')
@@ -115,16 +115,16 @@ export default function StudentRequestsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Department *</label>
-                <select value={deptId} onChange={e => setDeptId(e.target.value)} className="input" required disabled={!facultyId}>
-                  <option value="">{facultyId ? '— Select Department —' : 'Select faculty first'}</option>
+                <label className="block text-sm font-medium mb-1.5">Department (optional)</label>
+                <select value={deptId} onChange={e => setDeptId(e.target.value)} className="input" disabled={!facultyId}>
+                  <option value="">{facultyId ? '— Any Department (Faculty-wide) —' : 'Select faculty first'}</option>
                   {departments.map((d: any) => (
                     <option key={d.id} value={d.id}>{d.dept_name}</option>
                   ))}
                 </select>
-                {facultyId && departments.length === 0 && (
-                  <p className="text-[10px] text-amber-500 mt-1 font-semibold">⚠ No departments in this faculty.</p>
-                )}
+                <p className="text-[10px] text-[var(--muted)] mt-1">
+                  Leave blank to let the Dean assign any suitable supervisor in the faculty.
+                </p>
               </div>
             </div>
             <div>

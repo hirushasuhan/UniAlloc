@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
+import { getUser } from '@/lib/auth'
 import DashboardBanner from '@/components/ui/DashboardBanner'
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -76,7 +77,30 @@ export default function DeanDashboard() {
     u => u.role_name === 'department_head' || u.role_name === 'lecturer'
   )
 
+  // The logged-in dean, so their own workload can be shown alongside their staff
+  const currentUser = getUser()
+  const selfDean = users.find(u => u.role_name === 'dean' && u.id === currentUser?.id)
+
+  // Staff & Workloads directory: staff + the dean themselves (Staff Management stays staff-only)
+  const workloadDirectory = selfDean ? [selfDean, ...staffMembers] : staffMembers
+
+  // Capacity chart data: label the dean's own bar as "You" instead of their name
+  const workloadChartData = workload.map(w => ({
+    ...w,
+    full_name: w.user_id === currentUser?.id ? 'You' : w.full_name
+  }))
+
   const displayName = (u: any) => u.position ? `${u.position}. ${u.full_name}` : u.full_name
+
+  const roleBadge = (u: any) =>
+    u.role_name === 'dean'
+      ? { label: 'Dean', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' }
+      : u.role_name === 'department_head'
+        ? { label: 'Dept Head', className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' }
+        : { label: 'Lecturer', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' }
+
+  const staffSubtitle = (u: any) =>
+    u.role_name === 'dean' ? `${u.faculty_name ?? 'Faculty'} (Faculty-wide)` : (u.dept_name ?? 'No Department')
 
   // Departments that already have a Department Head (a department can only have ONE head)
   const deptsWithHead = new Set(
@@ -88,7 +112,7 @@ export default function DeanDashboard() {
     return workload.find(w => w.user_id === userId)
   }
 
-  const filteredStaff = staffMembers.filter(u => {
+  const filteredStaff = workloadDirectory.filter(u => {
     const matchesSearch = u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           u.email.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesDept = deptFilter === 'all' || u.department_id === parseInt(deptFilter)
@@ -270,17 +294,24 @@ export default function DeanDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Capacity Chart */}
           <div className="glass-card p-6">
-            <h2 className="font-heading font-semibold text-lg mb-4">Lecturer Capacity</h2>
+            <h2 className="font-heading font-semibold text-lg mb-4">Staff Capacity (incl. Dean)</h2>
             {workload.length === 0
               ? <p className="text-[var(--muted)] text-sm">No workload data.</p>
               : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={workload} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                    <XAxis dataKey="full_name" tick={{ fontSize: 11 }} />
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={workloadChartData} margin={{ top: 4, right: 8, bottom: 32, left: 0 }}>
+                    <XAxis
+                      dataKey="full_name"
+                      tick={{ fontSize: 11 }}
+                      interval={0}
+                      angle={-35}
+                      textAnchor="end"
+                      height={60}
+                    />
                     <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 11 }} />
                     <Tooltip formatter={(v: number) => `${v}%`} />
                     <Bar dataKey="utilization_pct" radius={[6,6,0,0]}>
-                      {workload.map((w, i) => (
+                      {workloadChartData.map((w, i) => (
                         <Cell key={i} fill={w.is_overloaded ? '#ef4444' : '#6366f1'} />
                       ))}
                     </Bar>
@@ -301,7 +332,7 @@ export default function DeanDashboard() {
                     <div key={r.id} className="flex items-start justify-between gap-4 p-3 rounded-xl bg-[var(--bg)]">
                       <div>
                         <p className="text-sm font-medium">{r.title}</p>
-                        <p className="text-xs text-[var(--muted)]">by {r.student_name}</p>
+                        <p className="text-xs text-[var(--muted)]">by {r.student_name} ({r.dept_name ?? 'Faculty-wide'})</p>
                         {r.status === 'pending' && (
                           <div className="flex gap-2 mt-2">
                             <Link href="/dean/student-requests" className="text-[10px] font-semibold bg-green-50 text-green-600 px-2 py-1 rounded hover:bg-green-100">Review & Assign</Link>
@@ -381,15 +412,14 @@ export default function DeanDashboard() {
                   >
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0">
-                        <h4 className="font-heading font-semibold text-sm truncate">{displayName(u)}</h4>
-                        <p className="text-xs text-[var(--muted)] mt-0.5 truncate">{u.dept_name ?? 'No Department'}</p>
+                        <h4 className="font-heading font-semibold text-sm truncate">{displayName(u)}{u.role_name === 'dean' ? ' (You)' : ''}</h4>
+                        <p className="text-xs text-[var(--muted)] mt-0.5 truncate">{staffSubtitle(u)}</p>
+                        <p className="text-[11px] text-[var(--muted)]/80 mt-0.5 truncate flex items-center gap-1">
+                          <Mail size={10} className="shrink-0" /> {u.email}
+                        </p>
                       </div>
-                      <span className={`badge shrink-0 text-[10px] ${
-                        u.role_name === 'department_head'
-                          ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                      }`}>
-                        {u.role_name === 'department_head' ? 'Dept Head' : 'Lecturer'}
+                      <span className={`badge shrink-0 text-[10px] ${roleBadge(u).className}`}>
+                        {roleBadge(u).label}
                       </span>
                     </div>
                     
@@ -446,17 +476,13 @@ export default function DeanDashboard() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="font-heading font-bold text-xl">{displayName(selectedLecturer)}</h2>
-                          <span className={`badge text-xs ${
-                            selectedLecturer.role_name === 'department_head'
-                              ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          }`}>
-                            {selectedLecturer.role_name === 'department_head' ? 'Department Head' : 'Lecturer'}
+                          <h2 className="font-heading font-bold text-xl">{displayName(selectedLecturer)}{selectedLecturer.role_name === 'dean' ? ' (You)' : ''}</h2>
+                          <span className={`badge text-xs ${roleBadge(selectedLecturer).className}`}>
+                            {selectedLecturer.role_name === 'dean' ? 'Dean' : selectedLecturer.role_name === 'department_head' ? 'Department Head' : 'Lecturer'}
                           </span>
                         </div>
                         <p className="text-sm text-[var(--muted)] mt-1 flex items-center gap-1.5">
-                          <HiOutlineBriefcase size={14} /> {selectedLecturer.dept_name ?? 'Unassigned Department'}
+                          <HiOutlineBriefcase size={14} /> {selectedLecturer.role_name === 'dean' ? staffSubtitle(selectedLecturer) : (selectedLecturer.dept_name ?? 'Unassigned Department')}
                         </p>
                       </div>
                     </div>
@@ -466,6 +492,14 @@ export default function DeanDashboard() {
                         <p className="flex items-center md:justify-end gap-1.5"><Phone size={12} /> {selectedLecturer.contact}</p>
                       )}
                       <p className="flex items-center md:justify-end gap-1.5"><Clock size={12} /> Capacity: {selectedLecturer.capacity_hours} hrs/week</p>
+                      {selectedLecturer.role_name !== 'dean' && (
+                        <a
+                          href={`mailto:${selectedLecturer.email}`}
+                          className="btn-secondary text-[11px] py-1.5 px-2.5 mt-2 rounded-lg inline-flex items-center gap-1.5 self-start md:self-end"
+                        >
+                          <Mail size={12} /> Send Mail
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>

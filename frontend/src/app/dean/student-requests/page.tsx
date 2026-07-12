@@ -80,7 +80,7 @@ export default function DeanStudentRequestsPage() {
               <tr key={r.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--bg)]/50">
                 <td className="py-3 px-4 font-medium">{r.student_name}</td>
                 <td className="py-3 px-4 max-w-[180px] truncate font-medium">{r.title}</td>
-                <td className="py-3 px-4 text-[var(--muted)]">{r.dept_name ?? '—'}</td>
+                <td className="py-3 px-4 text-[var(--muted)]">{r.dept_name ?? 'Faculty-wide'}</td>
                 <td className="py-3 px-4 text-[var(--muted)] max-w-[200px] truncate">{r.description ?? '—'}</td>
                 <td className="py-3 px-4"><span className={`badge ${STATUS_COLOR[r.status]}`}>{r.status}</span></td>
                 <td className="py-3 px-4 text-[var(--muted)]">{r.assigned_to_name ?? '—'}</td>
@@ -111,7 +111,7 @@ export default function DeanStudentRequestsPage() {
               <p>Student Name: <strong className="text-white">{selected.student_name}</strong></p>
               <p>Enrollment No: <strong className="text-white">{selected.student_enrollment ?? '—'}</strong></p>
               <p>Contact No: <strong className="text-white">{selected.student_contact ?? '—'}</strong></p>
-              <p>Requested Department: <strong className="text-white">{selected.dept_name ?? '—'}</strong></p>
+              <p>Requested Department: <strong className="text-white">{selected.dept_name ?? 'Faculty-wide (any department)'}</strong></p>
             </div>
             <p className="font-semibold mb-1">{selected.title}</p>
             {selected.description && <p className="text-sm text-[var(--muted)] mb-4">{selected.description}</p>}
