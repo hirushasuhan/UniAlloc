@@ -106,15 +106,17 @@ export default function DeptHeadRequestsPage() {
     } finally { setSaving(false) }
   }
 
-  // 1. Requests needing dept-head approval
-  const toApprove = requests.filter(r => r.approval_step === 'pending_dept_head')
+  // 1. Requests needing dept-head approval — ONLY if I am the head of the TARGET department
+  const toApprove = requests.filter(
+    r => r.approval_step === 'pending_dept_head' && Number(r.target_dept_id) === user?.dept_id
+  )
   // 2. Requests where I am the direct target (pending my acceptance)
   const toAccept  = requests.filter(
     r => r.approval_step === 'pending_assignee' && Number(r.target_user_id) === user?.id
   )
   // 3. All others
   const outgoing = requests.filter(
-    r => r.approval_step !== 'pending_dept_head' &&
+    r => !(r.approval_step === 'pending_dept_head' && Number(r.target_dept_id) === user?.dept_id) &&
          !(r.approval_step === 'pending_assignee' && Number(r.target_user_id) === user?.id)
   )
 

@@ -89,15 +89,17 @@ export default function DeanRequestsPage() {
     } finally { setSaving(false) }
   }
 
-  // 1. Requests needing my approval as dean of the target faculty
-  const toApprove = requests.filter(r => r.approval_step === 'pending_dean')
+  // 1. Requests needing my approval — ONLY if I am the dean of the TARGET faculty
+  const toApprove = requests.filter(
+    r => r.approval_step === 'pending_dean' && Number(r.target_faculty_id) === user?.faculty_id
+  )
   // 2. Requests where I am the direct target and need to accept/reject
   const toAccept  = requests.filter(
     r => r.approval_step === 'pending_assignee' && Number(r.target_user_id) === user?.id
   )
   // 3. Everything else (submitted by me, already resolved, in other steps)
   const other = requests.filter(
-    r => r.approval_step !== 'pending_dean' &&
+    r => !(r.approval_step === 'pending_dean' && Number(r.target_faculty_id) === user?.faculty_id) &&
          !(r.approval_step === 'pending_assignee' && Number(r.target_user_id) === user?.id)
   )
 
