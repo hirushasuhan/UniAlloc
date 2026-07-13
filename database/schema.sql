@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS `departments` (
 CREATE TABLE IF NOT EXISTS `users` (
   `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `full_name`         VARCHAR(200) NOT NULL,
-  `position`          VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Academic/professional title, e.g. Senior Prof, Prof, Senior Lecturer, Lecturer, Mr, Ms, Miss, Thero',
+  `title`             VARCHAR(20)  NULL DEFAULT NULL COMMENT 'Honorific prefix shown before the name, e.g. Dr, Prof, Mr, Mrs, Ms, Miss, Rev, Thero',
+  `position`          VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Academic rank / job position (full allowed list in UserDao::POSITIONS), e.g. Senior/Associate Professor, Senior Lecturer (Grade I/II), Lecturer (Grade I/II), Probationary/Assistant/Temporary/Visiting Lecturer, Instructor, Demonstrator, Research Assistant. Independent of title (a person can be Dr. AND a Senior Lecturer).',
   `email`             VARCHAR(200) NOT NULL UNIQUE,
   `password_hash`     VARCHAR(255) NOT NULL,
   `role_id`           TINYINT UNSIGNED NOT NULL,
@@ -57,6 +58,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `enrollment_number` VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Students only',
   `contact`           VARCHAR(50)  NULL DEFAULT NULL,
   `capacity_hours`    DECIMAL(6,2) NOT NULL DEFAULT 40.00 COMMENT 'Weekly available hours',
+  `operational_status` VARCHAR(30) NOT NULL DEFAULT 'Available' COMMENT 'Lecturer availability: Available, On Study Leave, Temporarily Not Available, On Vacation',
   `is_active`         TINYINT(1)   NOT NULL DEFAULT 1,
   `created_at`        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -190,8 +192,16 @@ CREATE TABLE IF NOT EXISTS `student_requests` (
   `title`       VARCHAR(300) NOT NULL,
   `description` TEXT NULL,
   `status`      ENUM('pending','assigned','rejected') NOT NULL DEFAULT 'pending',
+  -- Two-step approval chain position (see migration_07):
+  --   pending_home_head → student's own dept head endorses
+  --   pending_final     → dean / target dept head assigns supervisor & approves
+  `approval_step` ENUM('pending_home_head','pending_final','approved','rejected')
+                NOT NULL DEFAULT 'pending_home_head',
   `assigned_to` INT UNSIGNED NULL DEFAULT NULL,
   `reviewed_by` INT UNSIGNED NULL DEFAULT NULL,
+  `home_head_approved_by`   INT UNSIGNED NULL DEFAULT NULL,
+  `home_head_approved_at`   TIMESTAMP    NULL DEFAULT NULL,
+  `suggested_supervisor_id` INT UNSIGNED NULL DEFAULT NULL,
   `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -199,11 +209,14 @@ CREATE TABLE IF NOT EXISTS `student_requests` (
   KEY `idx_sreq_faculty`  (`faculty_id`),
   KEY `idx_sreq_department` (`department_id`),
   KEY `idx_sreq_status`   (`status`),
+  KEY `idx_sreq_approval_step` (`approval_step`),
   CONSTRAINT `fk_sreq_student`      FOREIGN KEY (`student_id`)  REFERENCES `users`     (`id`),
   CONSTRAINT `fk_sreq_faculty`      FOREIGN KEY (`faculty_id`)  REFERENCES `faculties` (`id`),
   CONSTRAINT `fk_sreq_department`   FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_sreq_assigned_to`  FOREIGN KEY (`assigned_to`) REFERENCES `users`     (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_sreq_reviewed_by`  FOREIGN KEY (`reviewed_by`) REFERENCES `users`     (`id`) ON DELETE SET NULL
+  CONSTRAINT `fk_sreq_reviewed_by`  FOREIGN KEY (`reviewed_by`) REFERENCES `users`     (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_sreq_home_head`    FOREIGN KEY (`home_head_approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_sreq_suggested`    FOREIGN KEY (`suggested_supervisor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------

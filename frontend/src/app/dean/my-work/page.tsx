@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import DeadlineAlerts from '@/components/ui/DeadlineAlerts'
 import { api } from '@/lib/api'
 import { getUser } from '@/lib/auth'
 import { HiOutlineBriefcase, HiOutlinePaperAirplane, HiOutlinePlus, HiOutlineXMark } from 'react-icons/hi2'
@@ -96,6 +97,9 @@ export default function DeanMyWorkPage() {
           {msg.text}
         </div>
       )}
+
+      {/* Overdue & approaching-deadline alerts for my own work (read-only) */}
+      <DeadlineAlerts assignments={assignments} onChanged={load} mode="view" />
 
       {assignments.length === 0 && (
         <div className="glass-card p-10 text-center">

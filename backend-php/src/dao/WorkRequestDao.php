@@ -155,6 +155,44 @@ class WorkRequestDao
     }
 
     // ------------------------------------------------------------------
+    // Cross-faculty step 1 → 2: the target's Dept Head approves, advance to
+    // pending_dean (dean of the target faculty approves next).
+    // ------------------------------------------------------------------
+    public static function advanceToDean(int $id, int $deptHeadId): bool
+    {
+        $stmt = Db::connection()->prepare(
+            "UPDATE work_requests
+             SET approval_step = 'pending_dean',
+                 dept_head_approved_by = :hid,
+                 dept_head_approved_at = NOW()
+             WHERE id = :id AND approval_step = 'pending_dept_head'"
+        );
+        $stmt->execute([':hid' => $deptHeadId, ':id' => $id]);
+        return $stmt->rowCount() > 0;
+    }
+
+    // ------------------------------------------------------------------
+    // Cross-faculty, department-head target: the Dean gives the final
+    // approval (the target head already accepted at the dept-head step),
+    // so the request is fully approved without a separate assignee step.
+    // ------------------------------------------------------------------
+    public static function deanFinalApprove(int $id, int $deanId): bool
+    {
+        $stmt = Db::connection()->prepare(
+            "UPDATE work_requests
+             SET status = 'approved',
+                 approval_step = 'approved',
+                 dean_approved_by = :did,
+                 dean_approved_at = NOW(),
+                 resolved_by = :did2,
+                 resolved_at = NOW()
+             WHERE id = :id AND approval_step = 'pending_dean'"
+        );
+        $stmt->execute([':did' => $deanId, ':did2' => $deanId, ':id' => $id]);
+        return $stmt->rowCount() > 0;
+    }
+
+    // ------------------------------------------------------------------
     // Dean OR dept-head advances request to pending_assignee
     // $approverType = 'dean' | 'dept_head'
     // ------------------------------------------------------------------

@@ -73,6 +73,9 @@ class UserController
             if (empty($body[$req])) Response::error("Field '$req' is required", 422);
         }
 
+        if (!empty($body['title']) && !in_array($body['title'], UserDao::TITLES, true)) {
+            Response::error('Invalid title value', 422);
+        }
         if (!empty($body['position']) && !in_array($body['position'], UserDao::POSITIONS, true)) {
             Response::error('Invalid position value', 422);
         }
@@ -141,8 +144,14 @@ class UserController
             Response::error('Forbidden', 403);
         }
 
+        if (!empty($body['title']) && !in_array($body['title'], UserDao::TITLES, true)) {
+            Response::error('Invalid title value', 422);
+        }
         if (!empty($body['position']) && !in_array($body['position'], UserDao::POSITIONS, true)) {
             Response::error('Invalid position value', 422);
+        }
+        if (!empty($body['operational_status']) && !in_array($body['operational_status'], UserDao::OPERATIONAL_STATUSES, true)) {
+            Response::error('Invalid operational status value', 422);
         }
 
         $ok = UserDao::update($id, $body);

@@ -106,7 +106,7 @@ class WorkloadService
              FROM users u
              LEFT JOIN assignments a ON a.assigned_to = u.id AND a.status IN ('pending','in_progress')
              WHERE u.department_id = :dept AND u.role_id = (SELECT id FROM roles WHERE role_name='lecturer')
-               AND u.id != :uid AND u.is_active = 1
+               AND u.id != :uid AND u.is_active = 1 AND u.operational_status = 'Available'
              GROUP BY u.id
              HAVING (allocated_hours / u.capacity_hours * 100) < 90
              ORDER BY allocated_hours ASC

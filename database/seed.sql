@@ -56,50 +56,50 @@ INSERT IGNORE INTO `users`
    '$2b$10$nBIhCNJQfZSrEJeZjh6daeY3BWxQ1UCzUEbu8aUA.RvAkAe1FNCMG', -- Admin@123
    1, NULL, 40.00);
 
--- Dean — Faculty of Computing
+-- Dean — Faculty of Computing  (Dr. AND a Professor)
 INSERT IGNORE INTO `users`
-  (`id`,`full_name`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
-  (2, 'Dr. Nimal Perera',
+  (`id`,`full_name`,`title`,`position`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
+  (2, 'Nimal Perera', 'Dr', 'Professor',
    'dean.computing@university.edu',
    '$2b$10$kIGutDJpAL3/MHPiFycDlOqDyK3F.CeZLNBIV96pY7zQRe6bNag7u', -- Dean@123
    2, NULL, 40.00);
 
--- Dean — Faculty of Engineering
+-- Dean — Faculty of Engineering  (Dr. AND a Professor)
 INSERT IGNORE INTO `users`
-  (`id`,`full_name`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
-  (3, 'Dr. Sunil Fernando',
+  (`id`,`full_name`,`title`,`position`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
+  (3, 'Sunil Fernando', 'Dr', 'Professor',
    'dean.engineering@university.edu',
    '$2b$10$21Ltb61IZ.4tcZVM2fWrHOPkw75RR9dFHm9fcwEbM8Q.9EGc/6LqC', -- Dean@123
    2, NULL, 40.00);
 
--- Department Head — Computer Science
+-- Department Head — Computer Science  (Dr. AND a Senior Lecturer — the exact case)
 INSERT IGNORE INTO `users`
-  (`id`,`full_name`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
-  (4, 'Dr. Amal Silva',
+  (`id`,`full_name`,`title`,`position`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
+  (4, 'Amal Silva', 'Dr', 'Senior Lecturer',
    'head.cs@university.edu',
    '$2b$10$MoO.vad.FRC99Ou1ohQ18.0r4i9VLQXWB3vMB00JRjMzDdadQc0BW', -- Head@123
    3, 1, 40.00);
 
--- Department Head — Software Engineering
+-- Department Head — Software Engineering  (Dr. AND a Senior Lecturer)
 INSERT IGNORE INTO `users`
-  (`id`,`full_name`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
-  (5, 'Dr. Kasun Bandara',
+  (`id`,`full_name`,`title`,`position`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
+  (5, 'Kasun Bandara', 'Dr', 'Senior Lecturer',
    'head.se@university.edu',
    '$2b$10$X/jgOBsfjbO1FJCtP7G0YOhrtQXPIl4BBrrp3RDJmvf.ET12ETcRi', -- Head@123
    3, 2, 40.00);
 
 -- Lecturer 1 — Computer Science
 INSERT IGNORE INTO `users`
-  (`id`,`full_name`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
-  (6, 'Mr. Roshan Jayawardena',
+  (`id`,`full_name`,`title`,`position`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
+  (6, 'Roshan Jayawardena', 'Mr', 'Lecturer',
    'lecturer1@university.edu',
    '$2b$10$xAlRbVfrW9mkH84cQAN6q..I./BDYh0yNKuVeXSWJMLnjPGcm6qkq', -- Lecturer@123
    4, 1, 40.00);
 
 -- Lecturer 2 — Software Engineering
 INSERT IGNORE INTO `users`
-  (`id`,`full_name`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
-  (7, 'Ms. Dilini Rajapaksa',
+  (`id`,`full_name`,`title`,`position`,`email`,`password_hash`,`role_id`,`department_id`,`capacity_hours`) VALUES
+  (7, 'Dilini Rajapaksa', 'Ms', 'Lecturer',
    'lecturer2@university.edu',
    '$2b$10$aIkvyRgiYMnJ.P6LdGbpvuk6KCgBG7kttExMpmGeF1sduVlytBdXC', -- Lecturer@123
    4, 2, 40.00);

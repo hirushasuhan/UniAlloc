@@ -20,8 +20,8 @@ class AuthController
 
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'SELECT u.id, u.full_name, u.position, u.email, u.password_hash, u.is_active,
-                    u.capacity_hours, u.department_id, u.enrollment_number,
+            'SELECT u.id, u.full_name, u.title, u.position, u.email, u.password_hash, u.is_active,
+                    u.capacity_hours, u.operational_status, u.department_id, u.enrollment_number,
                     r.role_name,
                     d.faculty_id,
                     f.faculty_name
@@ -73,7 +73,9 @@ class AuthController
             'user'  => [
                 'id'                => (int)$user['id'],
                 'full_name'         => $user['full_name'],
+                'title'             => $user['title'] ?? null,
                 'position'          => $user['position'] ?? null,
+                'operational_status'=> $user['operational_status'] ?? 'Available',
                 'email'             => $user['email'],
                 'role'              => $user['role_name'],
                 'dept_id'           => $user['department_id'] ? (int)$user['department_id'] : null,
@@ -176,6 +178,8 @@ class AuthController
                 'user'  => [
                     'id'                => (int)$user['id'],
                     'full_name'         => $user['full_name'],
+                    'title'             => null,
+                    'position'          => null,
                     'email'             => $user['email'],
                     'role'              => $user['role_name'],
                     'dept_id'           => $user['department_id'] ? (int)$user['department_id'] : null,

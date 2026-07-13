@@ -38,11 +38,11 @@ class UserDao
             $bind[':role_name'] = $filters['role_name'];
         }
 
-        $sql = 'SELECT u.id, u.full_name, u.position, u.email, u.role_id, r.role_name,
+        $sql = 'SELECT u.id, u.full_name, u.title, u.position, u.email, u.role_id, r.role_name,
                        u.department_id, d.dept_name,
                        COALESCE(d.faculty_id, f_dean.id) AS faculty_id,
                        COALESCE(f.faculty_name, f_dean.faculty_name) AS faculty_name,
-                       u.capacity_hours, u.contact, u.enrollment_number, u.is_active, u.created_at
+                       u.capacity_hours, u.operational_status, u.contact, u.enrollment_number, u.is_active, u.created_at
                 FROM users u
                 JOIN roles r ON r.id = u.role_id
                 LEFT JOIN departments d ON d.id = u.department_id
@@ -60,11 +60,11 @@ class UserDao
     {
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'SELECT u.id, u.full_name, u.position, u.email, u.role_id, r.role_name,
+            'SELECT u.id, u.full_name, u.title, u.position, u.email, u.role_id, r.role_name,
                     u.department_id, d.dept_name,
                     COALESCE(d.faculty_id, f_dean.id) AS faculty_id,
                     COALESCE(f.faculty_name, f_dean.faculty_name) AS faculty_name,
-                    u.capacity_hours, u.contact, u.enrollment_number, u.is_active, u.created_at
+                    u.capacity_hours, u.operational_status, u.contact, u.enrollment_number, u.is_active, u.created_at
              FROM users u
              JOIN roles r ON r.id = u.role_id
              LEFT JOIN departments d ON d.id = u.department_id
@@ -116,31 +116,47 @@ class UserDao
     }
 
     /**
-     * SQL expression producing a display name with the position prefixed,
-     * e.g. "Dr. Jane Silva". Falls back to full_name when position is NULL.
+     * SQL expression producing a display name with the honorific title
+     * prefixed, e.g. "Dr. Jane Silva". Falls back to full_name when title
+     * is NULL. Note: this uses `title` (the honorific), NOT `position`
+     * (the academic rank) — a "Senior Lecturer" is not a name prefix.
      */
     public static function displayNameSql(string $alias): string
     {
-        return "TRIM(CONCAT(COALESCE(CONCAT($alias.position, '. '), ''), $alias.full_name))";
+        return "TRIM(CONCAT(COALESCE(CONCAT($alias.title, '. '), ''), $alias.full_name))";
     }
 
-    /** Allowed academic/professional position titles (shown as a dropdown on the frontend) */
+    /** Allowed honorific titles / name prefixes (dropdown on the frontend) */
+    public const TITLES = [
+        'Prof', 'Dr', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero',
+    ];
+
+    /** Allowed academic ranks / job positions (dropdown on the frontend) */
     public const POSITIONS = [
-        'Senior Prof', 'Prof', 'Dr', 'Senior Lecturer', 'Lecturer',
-        'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero',
+        'Senior Professor', 'Professor', 'Associate Professor',
+        'Senior Lecturer', 'Senior Lecturer (Grade I)', 'Senior Lecturer (Grade II)',
+        'Lecturer', 'Lecturer (Grade I)', 'Lecturer (Grade II)',
+        'Probationary Lecturer', 'Assistant Lecturer', 'Temporary Lecturer',
+        'Visiting Lecturer', 'Instructor', 'Demonstrator', 'Research Assistant',
+    ];
+
+    /** Allowed lecturer operational (availability) statuses */
+    public const OPERATIONAL_STATUSES = [
+        'Available', 'On Study Leave', 'Temporarily Not Available', 'On Vacation',
     ];
 
     public static function create(array $data): int
     {
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'INSERT INTO users (full_name, position, email, password_hash, role_id, department_id,
+            'INSERT INTO users (full_name, title, position, email, password_hash, role_id, department_id,
                                 enrollment_number, contact, capacity_hours)
-             VALUES (:full_name, :position, :email, :password_hash, :role_id, :department_id,
+             VALUES (:full_name, :title, :position, :email, :password_hash, :role_id, :department_id,
                      :enrollment_number, :contact, :capacity_hours)'
         );
         $stmt->execute([
             ':full_name'         => $data['full_name'],
+            ':title'             => $data['title'] ?? null,
             ':position'          => $data['position'] ?? null,
             ':email'             => $data['email'],
             ':password_hash'     => password_hash($data['password'], PASSWORD_BCRYPT, ['cost' => 12]),
@@ -159,7 +175,7 @@ class UserDao
         $fields = [];
         $bind   = [':id' => $id];
 
-        foreach (['full_name','position','email','contact','capacity_hours','department_id','is_active'] as $col) {
+        foreach (['full_name','title','position','email','contact','capacity_hours','operational_status','department_id','is_active'] as $col) {
             if (array_key_exists($col, $data)) {
                 $fields[] = "$col = :$col";
                 $bind[":$col"] = $data[$col];

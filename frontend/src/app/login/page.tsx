@@ -19,9 +19,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [enrollmentNo, setEnrollmentNo] = useState('')
+  const [facultyId, setFacultyId] = useState('')
   const [deptId, setDeptId]     = useState('')
-  
+
   const [departments, setDepartments] = useState<any[]>([])
+
+  // Faculty list derived from the (public) departments payload, which already
+  // includes faculty_id + faculty_name. Avoids calling the auth-protected
+  // /faculties endpoint from the public registration view.
+  const faculties = Array.from(
+    new Map(departments.map(d => [d.faculty_id, d.faculty_name])).entries()
+  ).map(([id, faculty_name]) => ({ id, faculty_name }))
   
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
@@ -40,6 +48,7 @@ export default function LoginPage() {
     setPassword('')
     setFullName('')
     setEnrollmentNo('')
+    setFacultyId('')
     setDeptId('')
     setError('')
     setShowPassword(false)
@@ -317,18 +326,37 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Department</label>
+          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Faculty</label>
           <select
-            value={deptId}
-            onChange={e => setDeptId(e.target.value)}
+            value={facultyId}
+            onChange={e => { setFacultyId(e.target.value); setDeptId('') }}
             className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white
                        outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
             required
           >
-            <option value="" disabled>Select your department</option>
-            {departments.map(d => (
-              <option key={d.id} value={d.id}>{d.dept_name}</option>
+            <option value="" disabled>Select your faculty</option>
+            {faculties.map(f => (
+              <option key={f.id} value={f.id}>{f.faculty_name}</option>
             ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Department</label>
+          <select
+            value={deptId}
+            onChange={e => setDeptId(e.target.value)}
+            disabled={!facultyId}
+            className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white
+                       outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+            required
+          >
+            <option value="" disabled>{facultyId ? 'Select your department' : 'Select your faculty first'}</option>
+            {departments
+              .filter(d => d.faculty_id === parseInt(facultyId))
+              .map(d => (
+                <option key={d.id} value={d.id}>{d.dept_name}</option>
+              ))}
           </select>
         </div>
         <div className="space-y-1">

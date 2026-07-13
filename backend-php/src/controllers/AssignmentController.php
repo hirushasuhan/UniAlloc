@@ -174,6 +174,16 @@ class AssignmentController
             );
         }
 
+        // Optional custom warning from the dean / department head to the assignee
+        // (e.g. sent alongside a deadline extension for an overdue task)
+        if (!empty($body['notify_message'])) {
+            NotificationDao::create(
+                (int)$a['assigned_to'],
+                trim($body['notify_message']),
+                'warning'
+            );
+        }
+
         AuditLogDao::log($auth['sub'], 'update_assignment', 'assignments', $id);
         Response::success(['updated' => $ok]);
     }

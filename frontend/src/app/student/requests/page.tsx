@@ -54,7 +54,7 @@ export default function StudentRequestsPage() {
         faculty_id: parseInt(facultyId),
         department_id: deptId ? parseInt(deptId) : null
       })
-      setMsg({ text: 'Request submitted successfully! The Dean and the Department Head will review it shortly.', ok: true })
+      setMsg({ text: 'Request submitted! Your own department head will endorse it first, then it goes to the final approver (Dean or the target department head).', ok: true })
       setTitle(''); setDesc(''); setFacultyId(''); setDeptId('')
       load()
     } catch (err: any) {
@@ -68,6 +68,17 @@ export default function StudentRequestsPage() {
     pending:  'bg-amber-100 text-amber-700',
     assigned: 'bg-green-100 text-green-700',
     rejected: 'bg-red-100 text-red-700',
+  }
+
+  // Two-step approval chain, shown from the student's perspective
+  const stageLabel = (r: any): { text: string; cls: string } => {
+    switch (r.approval_step) {
+      case 'approved':          return { text: 'Approved',  cls: statusColor.assigned }
+      case 'rejected':          return { text: 'Rejected',  cls: statusColor.rejected }
+      case 'pending_final':     return { text: 'Endorsed · awaiting final approval', cls: 'bg-indigo-100 text-indigo-700' }
+      case 'pending_home_head': return { text: 'Awaiting dept endorsement', cls: statusColor.pending }
+      default:                  return { text: r.status, cls: statusColor[r.status] ?? 'bg-slate-100 text-slate-700' }
+    }
   }
 
   return (
@@ -154,9 +165,9 @@ export default function StudentRequestsPage() {
                   <div key={r.id} className="p-4 rounded-xl bg-[var(--bg)] border border-[var(--border)]">
                     <div className="flex items-start justify-between gap-3 mb-1">
                       <p className="font-semibold text-sm">{r.title}</p>
-                      <span className={`badge flex-shrink-0 ${statusColor[r.status] ?? 'bg-slate-100 text-slate-700'}`}>
-                        {r.status}
-                      </span>
+                      {(() => { const st = stageLabel(r); return (
+                        <span className={`badge flex-shrink-0 ${st.cls}`}>{st.text}</span>
+                      )})()}
                     </div>
                     {r.description && <p className="text-xs text-[var(--muted)] line-clamp-2">{r.description}</p>}
                     <p className="text-xs text-[var(--muted)] mt-1.5">

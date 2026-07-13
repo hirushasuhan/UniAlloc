@@ -5,7 +5,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import { getUser } from '@/lib/auth'
 import DashboardBanner from '@/components/ui/DashboardBanner'
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie
 } from 'recharts'
@@ -43,12 +43,14 @@ export default function DeanDashboard() {
   const [promotingId, setPromotingId] = useState<number | null>(null)
   
   const [isDark, setIsDark] = useState(false)
+  const [deptsWithoutHead, setDeptsWithoutHead] = useState<any[]>([])
 
   const loadData = () => {
     api.get('/assignments').then(r => setAssignments(r.data.data ?? []))
     api.get('/capacity').then(r => setWorkload(r.data.data ?? []))
     api.get('/student-requests').then(r => setStudentReqs(r.data.data ?? []))
     api.get('/users').then(r => setUsers(r.data.data ?? []))
+    api.get('/vacancies').then(r => setDeptsWithoutHead(r.data.data?.departments_without_head ?? [])).catch(() => {})
   }
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export default function DeanDashboard() {
     full_name: w.user_id === currentUser?.id ? 'You' : w.full_name
   }))
 
-  const displayName = (u: any) => u.position ? `${u.position}. ${u.full_name}` : u.full_name
+  const displayName = (u: any) => u.title ? `${u.title}. ${u.full_name}` : u.full_name
 
   const roleBadge = (u: any) =>
     u.role_name === 'dean'
@@ -102,9 +104,12 @@ export default function DeanDashboard() {
   const staffSubtitle = (u: any) =>
     u.role_name === 'dean' ? `${u.faculty_name ?? 'Faculty'} (Faculty-wide)` : (u.dept_name ?? 'No Department')
 
-  // Departments that already have a Department Head (a department can only have ONE head)
+  // Departments that already have an ACTIVE Department Head. A head who is On
+  // Study Leave (or deactivated) leaves the seat effectively vacant, so a
+  // replacement can be promoted in their place.
   const deptsWithHead = new Set(
-    staffMembers.filter(u => u.role_name === 'department_head' && u.department_id != null)
+    staffMembers.filter(u => u.role_name === 'department_head' && u.department_id != null
+                          && u.is_active && (u.operational_status ?? 'Available') !== 'On Study Leave')
                 .map(u => u.department_id)
   )
 
@@ -213,16 +218,19 @@ export default function DeanDashboard() {
     }
   }
 
-  // Lecturer -> Dept Head promotion handler
-  async function handlePromoteStaff(userId: number, currentRole: string) {
-    setPromotingId(userId)
+  // Lecturer <-> Dept Head promotion handler. When promoting to Department Head
+  // the target department is the lecturer's own department (required by the API).
+  async function handlePromoteStaff(user: any) {
+    setPromotingId(user.id)
     setStaffMsg(null)
-    const newRole = currentRole === 'lecturer' ? 'department_head' : 'lecturer'
+    const newRole = user.role_name === 'lecturer' ? 'department_head' : 'lecturer'
     try {
-      await api.post('/promotions', { user_id: userId, new_role: newRole })
-      setStaffMsg({ 
-        text: `Staff member promoted to ${newRole === 'department_head' ? 'Department Head' : 'Lecturer'} successfully.`, 
-        ok: true 
+      const payload: any = { user_id: user.id, new_role: newRole }
+      if (newRole === 'department_head') payload.department_id = user.department_id
+      await api.post('/promotions', payload)
+      setStaffMsg({
+        text: `Staff member ${newRole === 'department_head' ? 'promoted to Department Head' : 'changed to Lecturer'} successfully.`,
+        ok: true
       })
       loadData()
     } catch (err: any) {
@@ -237,6 +245,29 @@ export default function DeanDashboard() {
       <DashboardBanner />
       <h1 className="text-2xl font-heading font-bold mb-2">Dean Dashboard</h1>
       <p className="text-[var(--muted)] text-sm mb-8">Faculty-wide workload & assignment overview</p>
+
+      {/* Department-head vacancy alert (this faculty) */}
+      {deptsWithoutHead.length > 0 && (
+        <div className="mb-8 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-3">
+          <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 font-semibold text-sm">
+            <HiOutlineExclamationTriangle size={18}/> Departments without an active Head
+          </div>
+          <ul className="mt-2 space-y-1 text-sm">
+            {deptsWithoutHead.map((d: any) => (
+              <li key={d.id}>
+                <span className="font-medium">{d.dept_name}</span>
+                <span className="text-[var(--muted)]"> — no Head assigned. Please assign a Department Head.</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={() => { setActiveTab('management'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+            className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline"
+          >
+            Go to Staff Management →
+          </button>
+        </div>
+      )}
 
       {/* KPI Section */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -949,7 +980,7 @@ export default function DeanDashboard() {
                             ) : (
                               <button
                                 disabled={isPromoting || staffSaving}
-                                onClick={() => handlePromoteStaff(u.id, u.role_name)}
+                                onClick={() => handlePromoteStaff(u)}
                                 className="btn-secondary text-[11px] py-1.5 px-2.5 rounded-lg border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 active:scale-95 inline-flex items-center gap-1.5"
                               >
                                 {isPromoting ? (

@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Dao\StudentRequestDao;
 use App\Dao\AuditLogDao;
 use App\Dao\NotificationDao;
+use App\Dao\UserDao;
 use App\Helpers\Db;
 use App\Helpers\Response;
 use App\Middleware\JwtMiddleware;
@@ -94,20 +95,24 @@ class StudentRequestController
 
         $id = StudentRequestDao::create($auth['sub'], $facultyId, $body['title'], $body['description'] ?? null, $departmentId);
 
-        // Notify the Dean of this faculty
-        $f = $db->prepare('SELECT dean_id FROM faculties WHERE id = :fid');
-        $f->execute([':fid' => $facultyId]);
-        $frow = $f->fetch();
-        if ($frow && $frow['dean_id']) {
-            NotificationDao::create((int)$frow['dean_id'], "New student supervisor request: \"{$body['title']}\"", 'request');
-        }
+        // STEP 1 of the chain: notify ONLY the student's OWN department head to
+        // endorse first. The Dean / target department head are notified later,
+        // once the home head has endorsed (see update()).
+        $student  = UserDao::findById((int)$auth['sub']);
+        $homeDept = $student['department_id'] ?? null;
+        $homeHead = $homeDept ? UserDao::departmentHeadId((int)$homeDept) : null;
 
-        // Notify the Department Head of the chosen department
-        if ($departmentId) {
-            $headId = \App\Dao\UserDao::departmentHeadId($departmentId);
-            if ($headId) {
-                NotificationDao::create($headId, "New student supervisor request: \"{$body['title']}\"", 'request');
-            }
+        if ($homeHead) {
+            NotificationDao::create(
+                $homeHead,
+                "New student supervisor request awaiting your endorsement: \"{$body['title']}\"",
+                'request'
+            );
+        } else {
+            // No home department head on record — fall back to advancing the
+            // request straight to final approval so it never gets stuck.
+            StudentRequestDao::endorse($id, (int)$auth['sub'], null);
+            self::notifyFinalApprover($db, StudentRequestDao::findById($id), $body['title']);
         }
 
         AuditLogDao::log($auth['sub'], 'submit_student_request', 'student_requests', $id);
@@ -125,81 +130,209 @@ class StudentRequestController
         if (!$status && !empty($body['action'])) {
             $status = $body['action'] === 'approve' ? 'assigned' : ($body['action'] === 'reject' ? 'rejected' : '');
         }
-
-        if (!in_array($status, ['assigned','rejected'], true)) {
+        if (!in_array($status, ['assigned', 'rejected'], true)) {
             Response::error("status must be 'assigned' or 'rejected'", 422);
         }
 
         $sr = StudentRequestDao::findById($id);
         if (!$sr) Response::error('Student request not found', 404);
 
-        // Scope: dean → own faculty only; dept head → own department only
-        if ($auth['role'] === 'dean' && (int)$sr['faculty_id'] !== (int)$auth['faculty']) {
-            Response::error('Forbidden — this request belongs to another faculty.', 403);
-        }
-        if ($auth['role'] === 'department_head' && (int)($sr['department_id'] ?? 0) !== (int)$auth['dept']) {
-            Response::error('Forbidden — this request belongs to another department.', 403);
-        }
-
-        // Already handled? Don't let it be resolved twice (e.g. dean approved, then dept head)
-        if ($sr['status'] !== 'pending') {
+        // Already fully resolved?
+        if (in_array($sr['approval_step'], ['approved', 'rejected'], true)) {
             Response::error('This request has already been ' . $sr['status'] . '.', 409);
         }
 
-        $assignedTo = !empty($body['assigned_to']) ? (int)$body['assigned_to'] : null;
+        $db = Db::connection();
 
-        if ($status === 'assigned' && !$assignedTo) {
-            Response::error('assigned_to (supervisor) is required when approving a request.', 422);
+        $homeDeptId    = isset($sr['home_department_id']) ? (int)$sr['home_department_id'] : 0;
+        $homeFacultyId = isset($sr['home_faculty_id'])    ? (int)$sr['home_faculty_id']    : 0;
+        $targetFacId   = (int)$sr['faculty_id'];
+        $targetDeptId  = isset($sr['department_id']) ? (int)$sr['department_id'] : 0;
+
+        // Cross = the request targets a faculty or department the student does
+        // not belong to.
+        $isCross = ($targetFacId !== $homeFacultyId)
+                || ($targetDeptId && $targetDeptId !== $homeDeptId);
+
+        // ---------------------------------------------------------------
+        // STEP 1 — the student's own department head endorses (or rejects)
+        // ---------------------------------------------------------------
+        if ($sr['approval_step'] === 'pending_home_head') {
+            $isHomeHead = $auth['role'] === 'department_head' && (int)$auth['dept'] === $homeDeptId;
+            if (!$isHomeHead && $auth['role'] !== 'system_admin') {
+                Response::error('Only the student\'s own department head can endorse this request first.', 403);
+            }
+
+            if ($status === 'rejected') {
+                StudentRequestDao::reject($id, (int)$auth['sub']);
+                NotificationDao::create(
+                    (int)$sr['student_id'],
+                    "Your supervisor request \"{$sr['title']}\" was rejected by your department.",
+                    'request'
+                );
+                AuditLogDao::log($auth['sub'], 'student_request_rejected', 'student_requests', $id);
+                Response::success(['updated' => true]);
+            }
+
+            // Own-department request → the home head approves & assigns directly,
+            // in a single step (no Dean involvement). The supervisor is a lecturer
+            // from this same department.
+            $isOwnDepartment = $targetDeptId && $targetDeptId === $homeDeptId;
+            if ($isOwnDepartment) {
+                $assignedTo = !empty($body['assigned_to']) ? (int)$body['assigned_to'] : null;
+                if (!$assignedTo) {
+                    Response::error('assigned_to (supervisor) is required when approving a request.', 422);
+                }
+                if (!empty($body['deadline']) && $body['deadline'] < date('Y-m-d')) {
+                    Response::error('Deadline cannot be a past date.', 422);
+                }
+                StudentRequestDao::finalise($id, 'assigned', (int)$auth['sub'], $assignedTo);
+                self::assignSupervisor($sr, $assignedTo, (int)$auth['sub'], $body);
+                Response::success(['updated' => true]);
+            }
+
+            // Otherwise (faculty-wide / cross-department / cross-faculty) →
+            // endorse & advance to final approval, optionally suggesting a supervisor.
+            $suggested = !empty($body['suggested_supervisor_id']) ? (int)$body['suggested_supervisor_id'] : null;
+            StudentRequestDao::endorse($id, (int)$auth['sub'], $suggested);
+
+            $fresh = StudentRequestDao::findById($id);
+            self::notifyFinalApprover($db, $fresh, $sr['title']);
+
+            NotificationDao::create(
+                (int)$sr['student_id'],
+                "Your supervisor request \"{$sr['title']}\" was endorsed by your department and is awaiting final approval.",
+                'request'
+            );
+            AuditLogDao::log($auth['sub'], 'student_request_endorsed', 'student_requests', $id);
+            Response::success(['updated' => true, 'stage' => 'pending_final']);
         }
 
-        // Validate the deadline (if provided) is not in the past
+        // ---------------------------------------------------------------
+        // STEP 2 — final approval (assign supervisor) or rejection
+        // ---------------------------------------------------------------
+        // Determine who is allowed to act as the final approver.
+        $canFinalise = false;
+        if ($auth['role'] === 'system_admin') {
+            $canFinalise = true;
+        } elseif (!$isCross) {
+            // Same faculty → the Dean of the student's faculty.
+            $canFinalise = $auth['role'] === 'dean' && (int)$auth['faculty'] === $homeFacultyId;
+        } else {
+            // Cross faculty / department → target dept head OR target faculty dean.
+            $deanOk = $auth['role'] === 'dean' && (int)$auth['faculty'] === $targetFacId;
+            $headOk = $targetDeptId && $auth['role'] === 'department_head' && (int)$auth['dept'] === $targetDeptId;
+            $canFinalise = $deanOk || $headOk;
+        }
+        if (!$canFinalise) {
+            Response::error('You are not the final approver for this request.', 403);
+        }
+
+        if ($status === 'rejected') {
+            StudentRequestDao::finalise($id, 'rejected', (int)$auth['sub'], null);
+            NotificationDao::create(
+                (int)$sr['student_id'],
+                "Your supervisor request \"{$sr['title']}\" was rejected.",
+                'request'
+            );
+            AuditLogDao::log($auth['sub'], 'student_request_rejected', 'student_requests', $id);
+            Response::success(['updated' => true]);
+        }
+
+        // Approving requires a supervisor.
+        $assignedTo = !empty($body['assigned_to']) ? (int)$body['assigned_to'] : null;
+        if (!$assignedTo) {
+            Response::error('assigned_to (supervisor) is required when approving a request.', 422);
+        }
         if (!empty($body['deadline']) && $body['deadline'] < date('Y-m-d')) {
             Response::error('Deadline cannot be a past date.', 422);
         }
 
-        $ok = StudentRequestDao::update($id, $status, $auth['sub'], $assignedTo);
+        StudentRequestDao::finalise($id, 'assigned', (int)$auth['sub'], $assignedTo);
+        self::assignSupervisor($sr, $assignedTo, (int)$auth['sub'], $body);
+        Response::success(['updated' => true]);
+    }
 
+    /**
+     * Create the real supervision assignment for an approved request and fire
+     * the assignee + student notifications. Shared by the Dean/target-head
+     * final approval (Step 2) and the home head's direct own-department
+     * approval (Step 1 shortcut).
+     */
+    private static function assignSupervisor(array $sr, int $assignedTo, int $reviewedBy, array $body): void
+    {
         // Approving creates a REAL assignment so the supervision shows up in the
-        // lecturer's My Work / assignments, with priority, hours & deadline like any task.
-        if ($status === 'assigned' && $assignedTo) {
-            $assignee = \App\Dao\UserDao::findById($assignedTo);
+        // lecturer's My Work / assignments, with priority, hours & deadline.
+        $assignee = UserDao::findById($assignedTo);
 
-            $assignmentId = \App\Dao\AssignmentDao::create([
-                'title'           => 'Student Supervision: ' . $sr['title'],
-                'description'     => trim(
-                    "Supervisor allocation for student {$sr['student_name']}"
-                    . (!empty($sr['student_enrollment']) ? " ({$sr['student_enrollment']})" : '')
-                    . (!empty($sr['description']) ? "\n\n{$sr['description']}" : '')
-                ),
-                'assigned_to'     => $assignedTo,
-                'assigned_by'     => $auth['sub'],
-                'department_id'   => $sr['department_id'] ?? ($assignee['department_id'] ?? null),
-                'priority'        => in_array($body['priority'] ?? '', ['low','medium','high','urgent'], true)
-                                        ? $body['priority'] : 'medium',
-                'estimated_hours' => !empty($body['estimated_hours']) ? (float)$body['estimated_hours'] : 4,
-                'deadline'        => $body['deadline'] ?? null,
-            ]);
+        $assignmentId = \App\Dao\AssignmentDao::create([
+            'title'           => 'Student Supervision: ' . $sr['title'],
+            'description'     => trim(
+                "Supervisor allocation for student {$sr['student_name']}"
+                . (!empty($sr['student_enrollment']) ? " ({$sr['student_enrollment']})" : '')
+                . (!empty($sr['description']) ? "\n\n{$sr['description']}" : '')
+            ),
+            'assigned_to'     => $assignedTo,
+            'assigned_by'     => $reviewedBy,
+            'department_id'   => $sr['department_id'] ?? ($assignee['department_id'] ?? null),
+            'priority'        => in_array($body['priority'] ?? '', ['low', 'medium', 'high', 'urgent'], true)
+                                    ? $body['priority'] : 'medium',
+            'estimated_hours' => !empty($body['estimated_hours']) ? (float)$body['estimated_hours'] : 4,
+            'deadline'        => $body['deadline'] ?? null,
+        ]);
 
-            // Same follow-ups as a normal assignment
-            \App\Services\WorkloadService::checkAndNotifyOverload($assignedTo, $assignmentId, $auth['sub']);
-            NotificationDao::create(
-                $assignedTo,
-                "You have been assigned a new task: \"Student Supervision: {$sr['title']}\"",
-                'assignment'
-            );
-            AuditLogDao::log($auth['sub'], 'create_assignment', 'assignments', $assignmentId);
+        \App\Services\WorkloadService::checkAndNotifyOverload($assignedTo, $assignmentId, $reviewedBy);
+        NotificationDao::create(
+            $assignedTo,
+            "You have been assigned a new task: \"Student Supervision: {$sr['title']}\"",
+            'assignment'
+        );
+        AuditLogDao::log($reviewedBy, 'create_assignment', 'assignments', $assignmentId);
+
+        NotificationDao::create(
+            (int)$sr['student_id'],
+            "Your supervisor request \"{$sr['title']}\" was approved.",
+            'request'
+        );
+        AuditLogDao::log($reviewedBy, 'student_request_assigned', 'student_requests', (int)$sr['id']);
+    }
+
+    /**
+     * Notify the Step-2 final approver once a request has been endorsed:
+     *   • Same faculty (own dept / faculty-wide) → the Dean.
+     *   • Cross department → the TARGET department's head.
+     *   • Cross faculty (faculty-wide) → the TARGET faculty's Dean.
+     */
+    private static function notifyFinalApprover(\PDO $db, ?array $sr, string $title): void
+    {
+        if (!$sr) return;
+
+        $homeFacultyId = isset($sr['home_faculty_id'])    ? (int)$sr['home_faculty_id']    : 0;
+        $homeDeptId    = isset($sr['home_department_id']) ? (int)$sr['home_department_id'] : 0;
+        $targetFacId   = (int)$sr['faculty_id'];
+        $targetDeptId  = isset($sr['department_id']) ? (int)$sr['department_id'] : 0;
+
+        $isCross = ($targetFacId !== $homeFacultyId)
+                || ($targetDeptId && $targetDeptId !== $homeDeptId);
+
+        $msg = "Student supervisor request awaiting final approval: \"{$title}\"";
+
+        if ($isCross && $targetDeptId) {
+            // Cross-department → notify the target department's head.
+            $headId = UserDao::departmentHeadId($targetDeptId);
+            if ($headId) NotificationDao::create($headId, $msg, 'request');
+            return;
         }
 
-        $sr = StudentRequestDao::findById($id);
-        if ($sr) {
-            NotificationDao::create(
-                (int)$sr['student_id'],
-                "Your supervisor request \"{$sr['title']}\" was $status.",
-                'request'
-            );
+        // Same faculty, or cross-faculty faculty-wide → notify the relevant Dean.
+        $deanFacultyId = $isCross ? $targetFacId : $homeFacultyId;
+        if ($deanFacultyId) {
+            $f = $db->prepare('SELECT dean_id FROM faculties WHERE id = :fid');
+            $f->execute([':fid' => $deanFacultyId]);
+            $frow = $f->fetch();
+            if ($frow && $frow['dean_id']) {
+                NotificationDao::create((int)$frow['dean_id'], $msg, 'request');
+            }
         }
-
-        AuditLogDao::log($auth['sub'], "student_request_$status", 'student_requests', $id);
-        Response::success(['updated' => $ok]);
     }
 }

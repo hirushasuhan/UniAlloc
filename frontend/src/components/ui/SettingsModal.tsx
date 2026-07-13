@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { HiOutlineXMark, HiOutlineKey, HiOutlineArrowRightOnRectangle } from 'react-icons/hi2'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 
-const POSITIONS = ['Senior Prof', 'Prof', 'Dr', 'Senior Lecturer', 'Lecturer', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
+const TITLES = ['Prof', 'Dr', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
+const POSITIONS = ['Senior Professor', 'Professor', 'Associate Professor', 'Senior Lecturer', 'Senior Lecturer (Grade I)', 'Senior Lecturer (Grade II)', 'Lecturer', 'Lecturer (Grade I)', 'Lecturer (Grade II)', 'Probationary Lecturer', 'Assistant Lecturer', 'Temporary Lecturer', 'Visiting Lecturer', 'Instructor', 'Demonstrator', 'Research Assistant']
 
 interface Props {
   user: AuthUser
@@ -18,6 +19,7 @@ interface Props {
 export default function SettingsModal({ user, onClose, onChangePasswordClick, onUpdateUser }: Props) {
   const [form, setForm] = useState({
     full_name: user.full_name,
+    title: user.title ?? '',
     position: user.position ?? '',
     email: user.email,
     contact: user.contact ?? ''
@@ -41,7 +43,7 @@ export default function SettingsModal({ user, onClose, onChangePasswordClick, on
     setSuccess('')
 
     try {
-      const payload = { ...form, position: form.position || null }
+      const payload = { ...form, title: form.title || null, position: form.position || null }
       await api.put(`/users/${user.id}`, payload)
 
       const updatedUser = { ...user, ...payload }
@@ -85,17 +87,31 @@ export default function SettingsModal({ user, onClose, onChangePasswordClick, on
             {success && <div className="mb-4 text-sm text-green-500 bg-green-500/10 rounded-xl px-3 py-2 border border-green-500/20">{success}</div>}
             
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Position</label>
-                <select
-                  value={form.position}
-                  onChange={e => f('position', e.target.value)}
-                  className="input disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!isEditing}
-                >
-                  <option value="">— None —</option>
-                  {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Title</label>
+                  <select
+                    value={form.title}
+                    onChange={e => f('title', e.target.value)}
+                    className="input disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!isEditing}
+                  >
+                    <option value="">— None —</option>
+                    {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Position</label>
+                  <select
+                    value={form.position}
+                    onChange={e => f('position', e.target.value)}
+                    className="input disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!isEditing}
+                  >
+                    <option value="">— None —</option>
+                    {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Full Name *</label>
@@ -157,7 +173,7 @@ export default function SettingsModal({ user, onClose, onChangePasswordClick, on
                     type="button" 
                     onClick={() => {
                       setIsEditing(false)
-                      setForm({ full_name: user.full_name, position: user.position ?? '', email: user.email, contact: user.contact ?? '' })
+                      setForm({ full_name: user.full_name, title: user.title ?? '', position: user.position ?? '', email: user.email, contact: user.contact ?? '' })
                     }}
                     disabled={saving}
                     className="btn-secondary flex-1 justify-center"

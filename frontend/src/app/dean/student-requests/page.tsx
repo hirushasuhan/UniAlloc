@@ -24,7 +24,11 @@ export default function DeanStudentRequestsPage() {
     setSelected(r); setAssignTo(''); setPriority('medium'); setEstHours('4'); setDeadline('')
   }
 
-  const load = () => api.get('/student-requests').then(r => setRequests(r.data.data ?? []))
+  // Only show requests that have reached the Dean — i.e. already endorsed by
+  // the student's department head. Requests still awaiting that endorsement
+  // (pending_home_head) are hidden from the Dean's dashboard.
+  const load = () => api.get('/student-requests')
+    .then(r => setRequests((r.data.data ?? []).filter((x:any) => x.approval_step !== 'pending_home_head')))
   useEffect(() => {
     load()
     api.get('/users').then(r => setUsers(r.data.data ?? []))
@@ -57,6 +61,15 @@ export default function DeanStudentRequestsPage() {
     pending:'bg-amber-100 text-amber-700', assigned:'bg-green-100 text-green-700', rejected:'bg-red-100 text-red-700'
   }
 
+  // Two-step chain: the Dean only acts once the student's own department head
+  // has endorsed (approval_step === 'pending_final').
+  const stageLabel = (r: any): { text: string; cls: string } => {
+    if (r.approval_step === 'approved' || r.status === 'assigned') return { text: 'Approved', cls: 'bg-green-100 text-green-700' }
+    if (r.approval_step === 'rejected' || r.status === 'rejected') return { text: 'Rejected', cls: 'bg-red-100 text-red-700' }
+    if (r.approval_step === 'pending_home_head') return { text: 'Awaiting dept endorsement', cls: 'bg-slate-100 text-slate-600' }
+    return { text: 'Awaiting your approval', cls: 'bg-amber-100 text-amber-700' }
+  }
+
   return (
     <DashboardLayout requiredRole="dean">
       <h1 className="text-2xl font-heading font-bold mb-2">Student Supervisor Requests</h1>
@@ -71,7 +84,7 @@ export default function DeanStudentRequestsPage() {
       <div className="glass-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-[var(--border)]">
-            {['Student','Title','Department','Description','Status','Supervisor','Action'].map(h=>(
+            {['Student','Title','Department','Description','Stage','Supervisor','Action'].map(h=>(
               <th key={h} className="text-left py-3 px-4 text-[var(--muted)] font-medium">{h}</th>
             ))}
           </tr></thead>
@@ -82,10 +95,10 @@ export default function DeanStudentRequestsPage() {
                 <td className="py-3 px-4 max-w-[180px] truncate font-medium">{r.title}</td>
                 <td className="py-3 px-4 text-[var(--muted)]">{r.dept_name ?? 'Faculty-wide'}</td>
                 <td className="py-3 px-4 text-[var(--muted)] max-w-[200px] truncate">{r.description ?? '—'}</td>
-                <td className="py-3 px-4"><span className={`badge ${STATUS_COLOR[r.status]}`}>{r.status}</span></td>
+                <td className="py-3 px-4">{(() => { const st = stageLabel(r); return <span className={`badge ${st.cls}`}>{st.text}</span> })()}</td>
                 <td className="py-3 px-4 text-[var(--muted)]">{r.assigned_to_name ?? '—'}</td>
                 <td className="py-3 px-4">
-                  {r.status === 'pending' && (
+                  {r.approval_step === 'pending_final' && (
                     <button onClick={() => openReview(r)}
                       className="text-xs text-indigo-500 hover:underline font-medium">
                       Review
@@ -112,6 +125,9 @@ export default function DeanStudentRequestsPage() {
               <p>Enrollment No: <strong className="text-white">{selected.student_enrollment ?? '—'}</strong></p>
               <p>Contact No: <strong className="text-white">{selected.student_contact ?? '—'}</strong></p>
               <p>Requested Department: <strong className="text-white">{selected.dept_name ?? 'Faculty-wide (any department)'}</strong></p>
+              {selected.suggested_supervisor_name && (
+                <p>Suggested by dept: <strong className="text-white">{selected.suggested_supervisor_name}</strong></p>
+              )}
             </div>
             <p className="font-semibold mb-1">{selected.title}</p>
             {selected.description && <p className="text-sm text-[var(--muted)] mb-4">{selected.description}</p>}

@@ -107,6 +107,9 @@ $routes = [
     'PATCH /notifications/{id}/read'       => ['NotificationController', 'markRead'],
     'PATCH /notifications/read-all'        => ['NotificationController', 'markAllRead'],
 
+    // Leadership vacancies (dashboard alerts)
+    'GET /vacancies'                       => ['VacancyController', 'index'],
+
     // Role Promotions
     'GET /promotions'                      => ['PromotionController', 'index'],
     'POST /promotions'                     => ['PromotionController', 'store'],

@@ -5,7 +5,8 @@ import { api } from '@/lib/api'
 import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineUserPlus, HiOutlineUserMinus, HiOutlineXMark, HiOutlineKey, HiOutlineTrash } from 'react-icons/hi2'
 
 const ROLES = ['system_admin','dean','department_head','lecturer','student']
-const POSITIONS = ['Senior Prof', 'Prof', 'Dr', 'Senior Lecturer', 'Lecturer', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
+const TITLES = ['Prof', 'Dr', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
+const POSITIONS = ['Senior Professor', 'Professor', 'Associate Professor', 'Senior Lecturer', 'Senior Lecturer (Grade I)', 'Senior Lecturer (Grade II)', 'Lecturer', 'Lecturer (Grade I)', 'Lecturer (Grade II)', 'Probationary Lecturer', 'Assistant Lecturer', 'Temporary Lecturer', 'Visiting Lecturer', 'Instructor', 'Demonstrator', 'Research Assistant']
 
 export default function AdminUsersPage() {
   const [users,   setUsers]   = useState<any[]>([])
@@ -22,7 +23,7 @@ export default function AdminUsersPage() {
   const [selectedFaculty, setSelectedFaculty] = useState<string>('')
 
   const [form, setForm] = useState({
-    full_name:'', position:'', email:'', password:'', role_id:'4',
+    full_name:'', title:'', position:'', email:'', password:'', role_id:'4',
     department_id:'', contact:'', capacity_hours:'40'
   })
 
@@ -59,6 +60,7 @@ export default function AdminUsersPage() {
     try {
       await api.post('/users', {
         ...form,
+        title:          form.title || null,
         position:       form.position || null,
         role_id:        parseInt(form.role_id),
         department_id:  form.department_id ? parseInt(form.department_id) : null,
@@ -66,7 +68,7 @@ export default function AdminUsersPage() {
       })
       setMsg({ text: 'User created successfully.', ok: true })
       setShowModal(false)
-      setForm({ full_name:'', position:'', email:'', password:'', role_id:'4', department_id:'', contact:'', capacity_hours:'40' })
+      setForm({ full_name:'', title:'', position:'', email:'', password:'', role_id:'4', department_id:'', contact:'', capacity_hours:'40' })
       setSelectedFaculty('')
       load()
     } catch(err:any) {
@@ -98,6 +100,15 @@ export default function AdminUsersPage() {
       load()
     } catch(err:any) {
       setMsg({ text: err.response?.data?.message ?? 'Failed to delete user.', ok: false })
+    }
+  }
+
+  async function updateTitle(id:number, title:string) {
+    try {
+      await api.put(`/users/${id}`, { title: title || null })
+      load()
+    } catch(err:any) {
+      setMsg({ text: err.response?.data?.message ?? 'Failed to update title.', ok: false })
     }
   }
 
@@ -174,57 +185,85 @@ export default function AdminUsersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)]">
-              {['Name','Position','Email','Role','Department','Capacity (h)','Status','Actions'].map(h=>(
-                <th key={h} className="text-left py-3 px-4 text-[var(--muted)] font-medium">{h}</th>
+              {['User','Title / Position','Role','Department','Capacity','Status','Actions'].map(h=>(
+                <th key={h} className="text-left py-3 px-4 text-[var(--muted)] font-medium whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtered.map((u:any) => (
-              <tr key={u.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--bg)]/50">
-                <td className="py-3 px-4 font-medium">{u.position ? `${u.position}. ` : ''}{u.full_name}</td>
+              <tr key={u.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--bg)]/50 align-top">
+                {/* User: display name (title + name) + email underneath */}
                 <td className="py-3 px-4">
-                  <select
-                    value={u.position ?? ''}
-                    onChange={e => updatePosition(u.id, e.target.value)}
-                    className="input py-1 px-2 text-xs max-w-[140px]"
-                  >
-                    <option value="">— None —</option>
-                    {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                  <div className="flex items-center gap-3 min-w-[180px]">
+                    <div className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                      style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}>
+                      {(u.full_name?.[0] ?? '?').toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{u.title ? `${u.title}. ` : ''}{u.full_name}</div>
+                      <div className="text-xs text-[var(--muted)] truncate">{u.email}</div>
+                    </div>
+                  </div>
                 </td>
-                <td className="py-3 px-4 text-[var(--muted)]">{u.email}</td>
+
+                {/* Title / Position: two compact stacked quick-edit dropdowns */}
                 <td className="py-3 px-4">
-                  <span className={`badge ${roleColor[u.role_name] ?? 'bg-slate-100 text-slate-700'}`}>
+                  <div className="flex flex-col gap-1.5 min-w-[185px]">
+                    <select
+                      value={u.title ?? ''}
+                      onChange={e => updateTitle(u.id, e.target.value)}
+                      className="input py-1 px-2 text-xs"
+                    >
+                      <option value="">— Title —</option>
+                      {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <select
+                      value={u.position ?? ''}
+                      onChange={e => updatePosition(u.id, e.target.value)}
+                      className="input py-1 px-2 text-xs"
+                    >
+                      <option value="">— Position —</option>
+                      {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                </td>
+
+                <td className="py-3 px-4">
+                  <span className={`badge whitespace-nowrap ${roleColor[u.role_name] ?? 'bg-slate-100 text-slate-700'}`}>
                     {(u.role_name ?? '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                   </span>
                 </td>
-                <td className="py-3 px-4 text-[var(--muted)]">{u.dept_name ?? '—'}</td>
-                <td className="py-3 px-4 text-[var(--muted)]">{u.capacity_hours}h</td>
+                <td className="py-3 px-4 text-[var(--muted)] whitespace-nowrap">{u.dept_name ?? '—'}</td>
+                <td className="py-3 px-4 text-[var(--muted)] whitespace-nowrap">{u.capacity_hours}h</td>
                 <td className="py-3 px-4">
-                  <span className={`badge ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <span className={`badge whitespace-nowrap ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                     {u.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td className="py-3 px-4 flex gap-2">
-                  <button onClick={() => resetPassword(u.id)} title="Reset Password"
-                    className="inline-flex items-center justify-center w-7 h-7 bg-white/5 hover:bg-cyan-500/20 text-cyan-500 rounded-md transition-colors border border-white/5 hover:border-cyan-500/30">
-                    <HiOutlineKey size={14} />
-                  </button>
-                  <button onClick={() => toggleActive(u.id, u.is_active)}
-                    className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg transition-colors
-                      ${u.is_active ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'}`}>
-                    {u.is_active ? <><HiOutlineUserMinus size={13}/> Deactivate</> : <><HiOutlineUserPlus size={13}/> Activate</>}
-                  </button>
-                  <button onClick={() => deleteUser(u)} title="Permanently delete this user and all their data"
-                    className="inline-flex items-center justify-center w-7 h-7 bg-white/5 hover:bg-red-500/20 text-red-500 rounded-md transition-colors border border-white/5 hover:border-red-500/30">
-                    <HiOutlineTrash size={14} />
-                  </button>
+                <td className="py-3 px-4">
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => resetPassword(u.id)} title="Reset Password"
+                      className="inline-flex items-center justify-center w-7 h-7 bg-white/5 hover:bg-cyan-500/20 text-cyan-500 rounded-md transition-colors border border-white/5 hover:border-cyan-500/30">
+                      <HiOutlineKey size={14} />
+                    </button>
+                    <button onClick={() => toggleActive(u.id, u.is_active)} title={u.is_active ? 'Deactivate' : 'Activate'}
+                      className={`inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors
+                        ${u.is_active
+                          ? 'text-red-500 bg-white/5 hover:bg-red-500/20 border-white/5 hover:border-red-500/30'
+                          : 'text-green-500 bg-white/5 hover:bg-green-500/20 border-white/5 hover:border-green-500/30'}`}>
+                      {u.is_active ? <HiOutlineUserMinus size={14}/> : <HiOutlineUserPlus size={14}/>}
+                    </button>
+                    <button onClick={() => deleteUser(u)} title="Permanently delete this user and all their data"
+                      className="inline-flex items-center justify-center w-7 h-7 bg-white/5 hover:bg-red-500/20 text-red-500 rounded-md transition-colors border border-white/5 hover:border-red-500/30">
+                      <HiOutlineTrash size={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="py-8 text-center text-[var(--muted)]">No users found.</td></tr>
+              <tr><td colSpan={7} className="py-8 text-center text-[var(--muted)]">No users found.</td></tr>
             )}
           </tbody>
         </table>
@@ -244,12 +283,21 @@ export default function AdminUsersPage() {
                   <label className="block text-sm font-medium mb-1">Full Name *</label>
                   <input value={form.full_name} onChange={e=>setForm(f=>({...f,full_name:e.target.value}))} className="input" required placeholder="John Smith"/>
                 </div>
-                <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-medium mb-1">Position</label>
-                  <select value={form.position} onChange={e=>setForm(f=>({...f,position:e.target.value}))} className="input">
-                    <option value="">— None —</option>
-                    {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                <div className="col-span-2 md:col-span-1 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Title</label>
+                    <select value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} className="input">
+                      <option value="">— None —</option>
+                      {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Position</label>
+                    <select value={form.position} onChange={e=>setForm(f=>({...f,position:e.target.value}))} className="input">
+                      <option value="">— None —</option>
+                      {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">Email *</label>
