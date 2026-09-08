@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import DeadlineAlerts from '@/components/ui/DeadlineAlerts'
 import { api } from '@/lib/api'
 import { HiOutlineXMark } from 'react-icons/hi2'
 
@@ -42,6 +43,9 @@ export default function LecturerAssignmentsPage() {
           {msg.text}
         </div>
       )}
+
+      {/* Overdue & approaching-deadline assignments — with Appeal action */}
+      <DeadlineAlerts assignments={assignments} onChanged={load} mode="appeal" />
 
       <div className="space-y-4">
         {assignments.map((a:any) => (

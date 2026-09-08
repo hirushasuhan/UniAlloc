@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { saveAuth, roleHome } from '@/lib/auth'
 
 // Icons from react-icons
-import { HiOutlineUserGroup, HiOutlineAcademicCap, HiOutlineChevronRight, HiOutlineChevronLeft, HiOutlineExclamationCircle } from 'react-icons/hi2'
+import { HiOutlineUserGroup, HiOutlineAcademicCap, HiOutlineChevronRight, HiOutlineChevronLeft, HiOutlineExclamationCircle, HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2'
 import { AiOutlineLoading3Quarters } from 'react-icons/ai'
 
 type ViewState = 'select' | 'staff-login' | 'student-login' | 'student-register'
@@ -19,12 +19,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [enrollmentNo, setEnrollmentNo] = useState('')
+  const [facultyId, setFacultyId] = useState('')
   const [deptId, setDeptId]     = useState('')
-  
+
   const [departments, setDepartments] = useState<any[]>([])
+
+  // Faculty list derived from the (public) departments payload, which already
+  // includes faculty_id + faculty_name. Avoids calling the auth-protected
+  // /faculties endpoint from the public registration view.
+  const faculties = Array.from(
+    new Map(departments.map(d => [d.faculty_id, d.faculty_name])).entries()
+  ).map(([id, faculty_name]) => ({ id, faculty_name }))
   
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (view === 'student-register' && departments.length === 0) {
@@ -39,8 +48,10 @@ export default function LoginPage() {
     setPassword('')
     setFullName('')
     setEnrollmentNo('')
+    setFacultyId('')
     setDeptId('')
     setError('')
+    setShowPassword(false)
   }
 
   const changeView = (v: ViewState) => {
@@ -142,7 +153,7 @@ export default function LoginPage() {
 
       <div className="mt-8 pt-6">
         <p className="text-xs text-zinc-600 text-center font-medium tracking-wide uppercase">
-          Test: admin@university.edu / Admin@123
+          © {new Date().getFullYear()} UniAlloc. All rights reserved. <br />
         </p>
       </div>
     </div>
@@ -192,21 +203,32 @@ export default function LoginPage() {
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Password</label>
               <button 
                 type="button" 
-                onClick={() => alert('Please contact the System Administrator to reset your password.')} 
+                onClick={() => router.push('/forgot-password')} 
                 className={`text-xs text-${colorClass}-400 hover:text-${colorClass}-300 transition-colors`}
               >
                 Forgot?
               </button>
             </div>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className={`w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3.5 text-sm text-white
-                         placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-${colorClass}-500/50 focus:border-${colorClass}-500 transition-all`}
-              placeholder="••••••••"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className={`w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3.5 pr-12 text-sm text-white
+                           placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-${colorClass}-500/50 focus:border-${colorClass}-500 transition-all`}
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(s => !s)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+              >
+                {showPassword ? <HiOutlineEyeSlash className="w-5 h-5" /> : <HiOutlineEye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
           
           <button
@@ -304,31 +326,61 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Department</label>
+          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Faculty</label>
           <select
-            value={deptId}
-            onChange={e => setDeptId(e.target.value)}
+            value={facultyId}
+            onChange={e => { setFacultyId(e.target.value); setDeptId('') }}
             className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white
                        outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
             required
           >
-            <option value="" disabled>Select your department</option>
-            {departments.map(d => (
-              <option key={d.id} value={d.id}>{d.dept_name}</option>
+            <option value="" disabled>Select your faculty</option>
+            {faculties.map(f => (
+              <option key={f.id} value={f.id}>{f.faculty_name}</option>
             ))}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2.5 text-sm text-white
-                       placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
-            placeholder="••••••••"
+          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Department</label>
+          <select
+            value={deptId}
+            onChange={e => setDeptId(e.target.value)}
+            disabled={!facultyId}
+            className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white
+                       outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all
+                       disabled:opacity-50 disabled:cursor-not-allowed"
             required
-          />
+          >
+            <option value="" disabled>{facultyId ? 'Select your department' : 'Select your faculty first'}</option>
+            {departments
+              .filter(d => d.faculty_id === parseInt(facultyId))
+              .map(d => (
+                <option key={d.id} value={d.id}>{d.dept_name}</option>
+              ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider ml-1">Password</label>
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-2.5 pr-12 text-sm text-white
+                         placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+              placeholder="••••••••"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(s => !s)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              tabIndex={-1}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+            >
+              {showPassword ? <HiOutlineEyeSlash className="w-5 h-5" /> : <HiOutlineEye className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
         <button
           type="submit"

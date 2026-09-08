@@ -11,11 +11,13 @@ export default function AdminFacultiesPage() {
   const [expanded,  setExpanded]  = useState<number[]>([])
   const [showModal, setShowModal] = useState(false)
   const [deptModal, setDeptModal] = useState<number|null>(null)
+  const [deanModal, setDeanModal] = useState<number|null>(null)
   const [saving,    setSaving]    = useState(false)
   const [msg,       setMsg]       = useState<{text:string;ok:boolean}|null>(null)
 
   const [facForm, setFacForm] = useState({ faculty_name:'', dean_id:'' })
   const [deptForm, setDeptForm] = useState({ dept_name:'', head_id:'' })
+  const [deanForm, setDeanForm] = useState({ dean_id:'' })
 
   const load = () => {
     api.get('/faculties').then(r => setFaculties(r.data.data ?? []))
@@ -33,6 +35,21 @@ export default function AdminFacultiesPage() {
       await api.post('/faculties', { faculty_name: facForm.faculty_name, dean_id: facForm.dean_id || null })
       setMsg({ text: 'Faculty created.', ok: true })
       setShowModal(false); setFacForm({ faculty_name:'', dean_id:'' }); load()
+    } catch(err:any) { setMsg({ text: err.response?.data?.message ?? 'Error', ok: false }) }
+    finally { setSaving(false) }
+  }
+
+  function openDeanModal(f: any) {
+    setDeanForm({ dean_id: f.dean_id ? String(f.dean_id) : '' })
+    setDeanModal(f.id)
+  }
+
+  async function saveDean(e: FormEvent) {
+    e.preventDefault(); setSaving(true); setMsg(null)
+    try {
+      await api.put(`/faculties/${deanModal}`, { dean_id: deanForm.dean_id ? Number(deanForm.dean_id) : null })
+      setMsg({ text: 'Dean assignment updated.', ok: true })
+      setDeanModal(null); load()
     } catch(err:any) { setMsg({ text: err.response?.data?.message ?? 'Error', ok: false }) }
     finally { setSaving(false) }
   }
@@ -85,6 +102,10 @@ export default function AdminFacultiesPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <button onClick={e => { e.stopPropagation(); openDeanModal(f) }}
+                    className="btn-secondary text-xs py-1.5 px-3" title="Assign / change dean">
+                    Edit Dean
+                  </button>
                   <button onClick={e => { e.stopPropagation(); setDeptModal(f.id) }}
                     className="btn-secondary text-xs py-1.5 px-3" title="Add department">
                     <HiOutlinePlus size={13}/> Add Dept
@@ -131,10 +152,36 @@ export default function AdminFacultiesPage() {
                 <label className="block text-sm font-medium mb-1">Assign Dean</label>
                 <select value={facForm.dean_id} onChange={e=>setFacForm(f=>({...f,dean_id:e.target.value}))} className="input">
                   <option value="">— None —</option>
-                  {deans.map((d:any) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                  {deans.map((d:any) => <option key={d.id} value={d.id}>{d.position ? `${d.position}. ` : ''}{d.full_name}</option>)}
                 </select>
               </div>
               <button type="submit" disabled={saving} className="btn-primary w-full justify-center">{saving?'Creating…':'Create Faculty'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Dean Modal */}
+      {deanModal !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="glass-card w-full max-w-md p-6 relative">
+            <button onClick={() => setDeanModal(null)} className="absolute top-4 right-4 text-[var(--muted)]"><HiOutlineXMark size={18}/></button>
+            <h2 className="font-heading font-semibold text-lg mb-1">Assign Dean</h2>
+            <p className="text-sm text-[var(--muted)] mb-5">
+              Faculty: <strong>{faculties.find(f=>f.id===deanModal)?.faculty_name}</strong>
+            </p>
+            <form onSubmit={saveDean} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Dean</label>
+                <select value={deanForm.dean_id} onChange={e=>setDeanForm({dean_id:e.target.value})} className="input">
+                  <option value="">— None —</option>
+                  {deans.map((d:any) => <option key={d.id} value={d.id}>{d.position ? `${d.position}. ` : ''}{d.full_name}</option>)}
+                </select>
+                <p className="text-xs text-[var(--muted)] mt-1.5">
+                  This links the dean's account to this faculty. Without it, the dean's dashboard (Staff &amp; Workload) will show no data.
+                </p>
+              </div>
+              <button type="submit" disabled={saving} className="btn-primary w-full justify-center">{saving?'Saving…':'Save'}</button>
             </form>
           </div>
         </div>
@@ -158,7 +205,7 @@ export default function AdminFacultiesPage() {
                 <label className="block text-sm font-medium mb-1">Assign Department Head</label>
                 <select value={deptForm.head_id} onChange={e=>setDeptForm(f=>({...f,head_id:e.target.value}))} className="input">
                   <option value="">— None —</option>
-                  {heads.map((h:any) => <option key={h.id} value={h.id}>{h.full_name}</option>)}
+                  {heads.map((h:any) => <option key={h.id} value={h.id}>{h.position ? `${h.position}. ` : ''}{h.full_name}</option>)}
                 </select>
               </div>
               <button type="submit" disabled={saving} className="btn-primary w-full justify-center">{saving?'Creating…':'Add Department'}</button>

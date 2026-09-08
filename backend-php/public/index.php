@@ -60,6 +60,10 @@ $routes = [
     'POST /auth/login'                     => ['AuthController', 'login'],
     'POST /auth/register'                  => ['AuthController', 'register'],
     'POST /auth/logout'                    => ['AuthController', 'logout'],
+    'POST /auth/totp/setup'                => ['AuthController', 'totpSetup'],
+    'POST /auth/totp/verify'                => ['AuthController', 'totpVerify'],
+    'POST /auth/forgot-password/check'     => ['AuthController', 'forgotPasswordCheck'],
+    'POST /auth/forgot-password/reset'     => ['AuthController', 'forgotPasswordReset'],
 
     // Users
     'GET /users'                           => ['UserController', 'index'],
@@ -116,6 +120,9 @@ $routes = [
     'GET /notifications'                   => ['NotificationController', 'index'],
     'PATCH /notifications/{id}/read'       => ['NotificationController', 'markRead'],
     'PATCH /notifications/read-all'        => ['NotificationController', 'markAllRead'],
+
+    // Leadership vacancies (dashboard alerts)
+    'GET /vacancies'                       => ['VacancyController', 'index'],
 
     // Role Promotions
     'GET /promotions'                      => ['PromotionController', 'index'],

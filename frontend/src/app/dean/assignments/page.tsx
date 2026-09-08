@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AssignmentModal from '@/components/ui/AssignmentModal'
+import DeadlineAlerts from '@/components/ui/DeadlineAlerts'
 import { api } from '@/lib/api'
 import { getUser } from '@/lib/auth'
 import { HiOutlinePlus, HiOutlineMagnifyingGlass } from 'react-icons/hi2'
@@ -52,6 +53,9 @@ export default function DeanAssignmentsPage() {
         </div>
         <button onClick={() => setShowModal(true)} className="btn-primary"><HiOutlinePlus size={16}/> New Assignment</button>
       </div>
+
+      {/* Overdue & approaching-deadline assignments */}
+      <DeadlineAlerts assignments={assignments} onChanged={load} />
 
       <div className="flex flex-wrap gap-3 mb-5">
         <div className="relative flex-1 max-w-xs">

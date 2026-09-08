@@ -42,11 +42,14 @@ export default function DeanRequestsPage() {
     api.get('/faculties').then(r => setFaculties(r.data.data ?? []))
   }, [])
 
-  // When a target faculty is selected, load their users
+  // Cross-faculty requests can never target the dean's own faculty or themselves
+  const otherFaculties = faculties.filter((f: any) => f.id !== user?.faculty_id)
+
+  // When a target faculty is selected, load their users (excluding self)
   useEffect(() => {
     if (form.target_faculty_id) {
       api.get(`/users?faculty_id=${form.target_faculty_id}`)
-        .then(r => setUsers(r.data.data ?? []))
+        .then(r => setUsers((r.data.data ?? []).filter((u: any) => u.id !== user?.id)))
         .catch(() => setUsers([]))
     } else {
       setUsers([])
@@ -86,15 +89,17 @@ export default function DeanRequestsPage() {
     } finally { setSaving(false) }
   }
 
-  // 1. Requests needing my approval as dean of the target faculty
-  const toApprove = requests.filter(r => r.approval_step === 'pending_dean')
+  // 1. Requests needing my approval — ONLY if I am the dean of the TARGET faculty
+  const toApprove = requests.filter(
+    r => r.approval_step === 'pending_dean' && Number(r.target_faculty_id) === user?.faculty_id
+  )
   // 2. Requests where I am the direct target and need to accept/reject
   const toAccept  = requests.filter(
     r => r.approval_step === 'pending_assignee' && Number(r.target_user_id) === user?.id
   )
   // 3. Everything else (submitted by me, already resolved, in other steps)
   const other = requests.filter(
-    r => r.approval_step !== 'pending_dean' &&
+    r => !(r.approval_step === 'pending_dean' && Number(r.target_faculty_id) === user?.faculty_id) &&
          !(r.approval_step === 'pending_assignee' && Number(r.target_user_id) === user?.id)
   )
 
@@ -269,10 +274,11 @@ export default function DeanRequestsPage() {
                   onChange={e => setForm(f => ({ ...f, target_faculty_id: e.target.value, target_user_id: '' }))}
                   className="input" required>
                   <option value="">— Select faculty —</option>
-                  {faculties.map((f: any) => (
+                  {otherFaculties.map((f: any) => (
                     <option key={f.id} value={f.id}>{f.faculty_name}</option>
                   ))}
                 </select>
+                <p className="text-[10px] text-[var(--muted)] mt-1">Your own faculty is not listed — assign work within your faculty directly from Assignments.</p>
               </div>
 
               {form.target_faculty_id && (
@@ -284,7 +290,7 @@ export default function DeanRequestsPage() {
                     <option value="">— Select person —</option>
                     {users.map((u: any) => (
                       <option key={u.id} value={u.id}>
-                        {u.full_name} ({u.role_name?.replace('_', ' ')})
+                        {u.position ? `${u.position}. ` : ''}{u.full_name} ({u.role_name?.replace('_', ' ')})
                       </option>
                     ))}
                   </select>

@@ -28,7 +28,7 @@ class AppealDao
         }
 
         $stmt = Db::connection()->prepare(
-            'SELECT wa.*, u.full_name AS lecturer_name, a.title AS assignment_title
+            'SELECT wa.*, ' . UserDao::displayNameSql('u') . ' AS lecturer_name, a.title AS assignment_title
              FROM workload_appeals wa
              JOIN users u ON u.id = wa.lecturer_id
              LEFT JOIN assignments a ON a.id = wa.assignment_id
@@ -43,7 +43,7 @@ class AppealDao
     public static function findById(int $id): ?array
     {
         $stmt = Db::connection()->prepare(
-            'SELECT wa.*, u.full_name AS lecturer_name
+            'SELECT wa.*, ' . UserDao::displayNameSql('u') . ' AS lecturer_name
              FROM workload_appeals wa JOIN users u ON u.id = wa.lecturer_id
              WHERE wa.id = :id'
         );

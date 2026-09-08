@@ -12,13 +12,13 @@ class WorkRequestDao
     {
         return '
             SELECT wr.*,
-                   ur.full_name    AS requester_name,
-                   ut.full_name    AS target_user_name,
+                   ' . UserDao::displayNameSql('ur') . '  AS requester_name,
+                   ' . UserDao::displayNameSql('ut') . '  AS target_user_name,
                    ut.role_id      AS target_user_role_id,
                    d.dept_name     AS target_dept_name,
                    f.faculty_name  AS target_faculty_name,
-                   da.full_name    AS dean_approver_name,
-                   dha.full_name   AS dept_head_approver_name
+                   ' . UserDao::displayNameSql('da') . '  AS dean_approver_name,
+                   ' . UserDao::displayNameSql('dha') . ' AS dept_head_approver_name
             FROM work_requests wr
             JOIN  users ur  ON ur.id  = wr.requester_id
             LEFT JOIN users ut  ON ut.id  = wr.target_user_id
@@ -151,6 +151,44 @@ class WorkRequestDao
              WHERE id = :id AND approval_step = 'pending_dean'"
         );
         $stmt->execute([':did' => $deanId, ':id' => $id]);
+        return $stmt->rowCount() > 0;
+    }
+
+    // ------------------------------------------------------------------
+    // Cross-faculty step 1 → 2: the target's Dept Head approves, advance to
+    // pending_dean (dean of the target faculty approves next).
+    // ------------------------------------------------------------------
+    public static function advanceToDean(int $id, int $deptHeadId): bool
+    {
+        $stmt = Db::connection()->prepare(
+            "UPDATE work_requests
+             SET approval_step = 'pending_dean',
+                 dept_head_approved_by = :hid,
+                 dept_head_approved_at = NOW()
+             WHERE id = :id AND approval_step = 'pending_dept_head'"
+        );
+        $stmt->execute([':hid' => $deptHeadId, ':id' => $id]);
+        return $stmt->rowCount() > 0;
+    }
+
+    // ------------------------------------------------------------------
+    // Cross-faculty, department-head target: the Dean gives the final
+    // approval (the target head already accepted at the dept-head step),
+    // so the request is fully approved without a separate assignee step.
+    // ------------------------------------------------------------------
+    public static function deanFinalApprove(int $id, int $deanId): bool
+    {
+        $stmt = Db::connection()->prepare(
+            "UPDATE work_requests
+             SET status = 'approved',
+                 approval_step = 'approved',
+                 dean_approved_by = :did,
+                 dean_approved_at = NOW(),
+                 resolved_by = :did2,
+                 resolved_at = NOW()
+             WHERE id = :id AND approval_step = 'pending_dean'"
+        );
+        $stmt->execute([':did' => $deanId, ':did2' => $deanId, ':id' => $id]);
         return $stmt->rowCount() > 0;
     }
 

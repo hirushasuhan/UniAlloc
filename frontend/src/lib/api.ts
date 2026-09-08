@@ -13,16 +13,6 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-<<<<<<< Updated upstream
-// Global 401 → redirect to login
-api.interceptors.response.use(
-  (r) => r,
-  (err) => {
-    if (err.response?.status === 401 && typeof window !== 'undefined') {
-      sessionStorage.removeItem('ua_token')
-      sessionStorage.removeItem('ua_user')
-      window.location.href = '/login'
-=======
 // Global auth failure handling.
 //   401 → token invalid, expired, or revoked server-side (password changed,
 //         account deactivated). Purge local state and bounce to the right page.
@@ -59,7 +49,6 @@ api.interceptors.response.use(
           window.location.replace(expired ? '/login' : '/no-access')
         })
       }
->>>>>>> Stashed changes
     }
 
     return Promise.reject(err)

@@ -72,6 +72,11 @@ class AssignmentController
             if (empty($body[$req])) Response::error("Field '$req' is required", 422);
         }
 
+        // Deadline cannot be a past date
+        if (!empty($body['deadline']) && $body['deadline'] < date('Y-m-d')) {
+            Response::error('Deadline cannot be a past date.', 422);
+        }
+
         $assigneeId = (int)$body['assigned_to'];
         $assignee = UserDao::findById($assigneeId);
         if (!$assignee) {
@@ -125,7 +130,40 @@ class AssignmentController
         $a = AssignmentDao::findById($id);
         if (!$a) Response::error('Assignment not found', 404);
 
+        // Deadline cannot be moved to a past date
+        if (!empty($body['deadline']) && $body['deadline'] < date('Y-m-d')) {
+            Response::error('Deadline cannot be a past date.', 422);
+        }
+
         $ok = AssignmentDao::update($id, $body);
+
+        // Notify the lecturer about remedial changes (e.g. after an appeal review)
+        if ($ok) {
+            $changes = [];
+            if (isset($body['priority']) && $body['priority'] !== $a['priority']) {
+                $changes[] = "priority changed to '{$body['priority']}'";
+            }
+            if (array_key_exists('deadline', $body) && $body['deadline'] !== $a['deadline']) {
+                $changes[] = 'deadline ' . ($body['deadline'] ? "extended to {$body['deadline']}" : 'removed');
+            }
+            if (isset($body['estimated_hours']) && (float)$body['estimated_hours'] !== (float)$a['estimated_hours']) {
+                $changes[] = "estimated hours changed to {$body['estimated_hours']}h";
+            }
+            if ($changes) {
+                NotificationDao::create(
+                    (int)$a['assigned_to'],
+                    "Your task \"{$a['title']}\" was updated: " . implode(', ', $changes) . '.',
+                    'assignment'
+                );
+            }
+            if (isset($body['status']) && $body['status'] === 'cancelled' && $a['status'] !== 'cancelled') {
+                NotificationDao::create(
+                    (int)$a['assigned_to'],
+                    "Your task \"{$a['title']}\" has been removed from your workload.",
+                    'assignment'
+                );
+            }
+        }
 
         // Notify if approved
         if (isset($body['status']) && $body['status'] === 'completed' && $a['status'] === 'review_pending') {
@@ -133,6 +171,16 @@ class AssignmentController
                 (int)$a['assigned_to'],
                 "Your task \"{$a['title']}\" was approved and marked as completed.",
                 'assignment'
+            );
+        }
+
+        // Optional custom warning from the dean / department head to the assignee
+        // (e.g. sent alongside a deadline extension for an overdue task)
+        if (!empty($body['notify_message'])) {
+            NotificationDao::create(
+                (int)$a['assigned_to'],
+                trim($body['notify_message']),
+                'warning'
             );
         }
 

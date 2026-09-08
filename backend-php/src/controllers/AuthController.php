@@ -4,13 +4,12 @@ namespace App\Controllers;
 use App\Helpers\Db;
 use App\Helpers\JwtHelper;
 use App\Helpers\Response;
+use App\Helpers\Totp;
+use App\Middleware\JwtMiddleware;
 use App\Dao\AuditLogDao;
-<<<<<<< Updated upstream
-=======
 use App\Dao\LoginAttemptDao;
 use App\Dao\UserDao;
 use App\Helpers\PasswordPolicy;
->>>>>>> Stashed changes
 
 class AuthController
 {
@@ -34,13 +33,8 @@ class AuthController
 
         $db   = Db::connection();
         $stmt = $db->prepare(
-<<<<<<< Updated upstream
-            'SELECT u.id, u.full_name, u.email, u.password_hash, u.is_active,
-                    u.capacity_hours, u.department_id, u.enrollment_number,
-=======
             'SELECT u.id, u.full_name, u.title, u.position, u.email, u.password_hash, u.is_active, u.totp_enabled, u.token_version,
                     u.capacity_hours, u.operational_status, u.department_id, u.enrollment_number,
->>>>>>> Stashed changes
                     r.role_name,
                     d.faculty_id,
                     f.faculty_name
@@ -98,6 +92,9 @@ class AuthController
             'user'  => [
                 'id'                => (int)$user['id'],
                 'full_name'         => $user['full_name'],
+                'title'             => $user['title'] ?? null,
+                'position'          => $user['position'] ?? null,
+                'operational_status'=> $user['operational_status'] ?? 'Available',
                 'email'             => $user['email'],
                 'role'              => $user['role_name'],
                 'dept_id'           => $user['department_id'] ? (int)$user['department_id'] : null,
@@ -105,6 +102,7 @@ class AuthController
                 'faculty_name'      => $facultyName,
                 'enrollment_number' => $user['enrollment_number'] ?? null,
                 'contact'           => $user['contact'] ?? null,
+                'totp_enabled'      => (bool)$user['totp_enabled'],
             ],
         ], 'Login successful');
     }
@@ -189,11 +187,7 @@ class AuthController
 
             // Auto-login logic
             $stmt = $db->prepare(
-<<<<<<< Updated upstream
-                'SELECT u.id, u.full_name, u.email, u.department_id, u.enrollment_number,
-=======
                 'SELECT u.id, u.full_name, u.email, u.department_id, u.enrollment_number, u.totp_enabled, u.token_version,
->>>>>>> Stashed changes
                         r.role_name, d.faculty_id, f.faculty_name
                  FROM users u
                  JOIN roles r ON r.id = u.role_id
@@ -226,6 +220,8 @@ class AuthController
                 'user'  => [
                     'id'                => (int)$user['id'],
                     'full_name'         => $user['full_name'],
+                    'title'             => null,
+                    'position'          => null,
                     'email'             => $user['email'],
                     'role'              => $user['role_name'],
                     'dept_id'           => $user['department_id'] ? (int)$user['department_id'] : null,
@@ -233,6 +229,7 @@ class AuthController
                     'faculty_name'      => $facultyName,
                     'enrollment_number' => $user['enrollment_number'] ?? null,
                     'contact'           => null,
+                    'totp_enabled'      => (bool)$user['totp_enabled'],
                 ],
             ], 'Registration successful');
 
@@ -246,8 +243,6 @@ class AuthController
             );
         }
     }
-<<<<<<< Updated upstream
-=======
 
     // ------------------------------------------------------------
     // TOTP self-service password recovery
@@ -345,5 +340,4 @@ class AuthController
 
         Response::success(['message' => 'Password reset successfully'], 'Password reset successfully');
     }
->>>>>>> Stashed changes
 }

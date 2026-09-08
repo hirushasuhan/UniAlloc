@@ -9,7 +9,10 @@ class FacultyController
 {
     public function index(array $params = []): void
     {
-        JwtMiddleware::handle(['system_admin', 'dean']);
+        // Any authenticated user may list faculties (students need this to
+        // pick a target faculty for supervisor requests; dept heads use it
+        // for cross-faculty work requests).
+        JwtMiddleware::handle();
         Response::success(FacultyDao::list());
     }
 

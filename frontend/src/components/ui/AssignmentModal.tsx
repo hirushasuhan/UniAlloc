@@ -32,7 +32,22 @@ export default function AssignmentModal({ users, depts, assignedBy, defaultDeptI
   const [saving, setSaving] = useState(false)
   const [err,    setErr]    = useState('')
 
-  const lecturers = users.filter(u => ['lecturer','department_head'].includes(u.role_name))
+  // Display helper: prefix academic position (e.g. "Dr. ", "Prof. ") before the name
+  const displayName = (u: any) => u.position ? `${u.position}. ${u.full_name}` : u.full_name
+
+  // Today's date (local) in YYYY-MM-DD — used to block past deadlines
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+
+  // Staff selectable only AFTER a department is chosen — filtered by that department
+  const lecturers = form.department_id
+    ? users.filter(u =>
+        ['lecturer', 'department_head'].includes(u.role_name) &&
+        u.department_id === parseInt(form.department_id)
+      )
+    : []
 
   useEffect(() => {
     api.get('/faculties').then(r => {
@@ -58,6 +73,11 @@ export default function AssignmentModal({ users, depts, assignedBy, defaultDeptI
   const currentFacultyId = currentUser?.faculty_id
   const externalFaculties = allFaculties.filter(f => f.id !== currentFacultyId)
 
+  // Department heads can only assign within their own department
+  const availableDepts = currentUser?.role === 'department_head'
+    ? depts.filter((d: any) => d.id === currentUser?.dept_id)
+    : depts
+
   // Filter external users by target faculty and target role
   const filteredTargetUsers = allUsers.filter(u => {
     const matchesFaculty = u.faculty_id === parseInt(requestForm.target_faculty_id)
@@ -69,6 +89,9 @@ export default function AssignmentModal({ users, depts, assignedBy, defaultDeptI
     e.preventDefault(); setSaving(true); setErr('')
     try {
       if (mode === 'direct') {
+        if (form.deadline && form.deadline < today) {
+          throw new Error('Deadline cannot be a past date.')
+        }
         await api.post('/assignments', {
           title:           form.title,
           description:     form.description || null,
@@ -149,20 +172,36 @@ export default function AssignmentModal({ users, depts, assignedBy, defaultDeptI
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Assign To *</label>
-                  <select value={form.assigned_to} onChange={e=>f('assigned_to',e.target.value)} className="input" required>
-                    <option value="">— Select —</option>
-                    {lecturers.map((u:any) => (
-                      <option key={u.id} value={u.id}>{u.full_name} ({u.role_name.replace('_',' ')})</option>
-                    ))}
+                  <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Department *</label>
+                  <select
+                    value={form.department_id}
+                    onChange={e => setForm(p => ({ ...p, department_id: e.target.value, assigned_to: '' }))}
+                    className="input"
+                    required
+                  >
+                    <option value="">— Select Department —</option>
+                    {availableDepts.map((d:any) => <option key={d.id} value={d.id}>{d.dept_name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Department</label>
-                  <select value={form.department_id} onChange={e=>f('department_id',e.target.value)} className="input">
-                    <option value="">— None —</option>
-                    {depts.map((d:any) => <option key={d.id} value={d.id}>{d.dept_name}</option>)}
+                  <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Assign To *</label>
+                  <select
+                    value={form.assigned_to}
+                    onChange={e=>f('assigned_to',e.target.value)}
+                    className="input"
+                    required
+                    disabled={!form.department_id}
+                  >
+                    <option value="">{form.department_id ? '— Select Staff —' : 'Select department first'}</option>
+                    {lecturers.map((u:any) => (
+                      <option key={u.id} value={u.id}>{displayName(u)} ({u.role_name.replace('_',' ')})</option>
+                    ))}
                   </select>
+                  {form.department_id && lecturers.length === 0 && (
+                    <p className="text-[10px] text-amber-500 mt-1 font-semibold">
+                      ⚠ No staff found in this department.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Priority</label>
@@ -179,7 +218,7 @@ export default function AssignmentModal({ users, depts, assignedBy, defaultDeptI
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">Deadline</label>
-                  <input type="date" value={form.deadline} onChange={e=>f('deadline',e.target.value)} className="input"/>
+                  <input type="date" min={today} value={form.deadline} onChange={e=>f('deadline',e.target.value)} className="input"/>
                 </div>
               </div>
             </>
@@ -239,7 +278,7 @@ export default function AssignmentModal({ users, depts, assignedBy, defaultDeptI
                   <option value="">— Select Target Staff —</option>
                   {filteredTargetUsers.map((u:any) => (
                     <option key={u.id} value={u.id}>
-                      {u.full_name} ({u.dept_name ?? 'Dean'})
+                      {displayName(u)} ({u.dept_name ?? 'Dean'})
                     </option>
                   ))}
                 </select>

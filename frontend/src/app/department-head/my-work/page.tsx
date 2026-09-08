@@ -1,20 +1,54 @@
 'use client'
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import DeadlineAlerts from '@/components/ui/DeadlineAlerts'
 import { api } from '@/lib/api'
-import { HiOutlineBriefcase } from 'react-icons/hi2'
+import { getUser } from '@/lib/auth'
+import { HiOutlineBriefcase, HiOutlinePlus, HiOutlineXMark } from 'react-icons/hi2'
 
 export default function DeptHeadMyWorkPage() {
+  const user = getUser()
   const [assignments, setAssignments] = useState<any[]>([])
   const [updating,    setUpdating]    = useState<number | null>(null)
   const [pct,         setPct]         = useState(0)
   const [note,        setNote]        = useState('')
   const [msg,         setMsg]         = useState<{ text: string; ok: boolean } | null>(null)
 
+  // Self-allocation modal
+  const [showSelf, setShowSelf] = useState(false)
+  const [selfSaving, setSelfSaving] = useState(false)
+  const [selfForm, setSelfForm] = useState({
+    title: '', description: '', priority: 'medium', estimated_hours: '4', deadline: ''
+  })
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+
   const load = () =>
     api.get('/assignments?my=1').then(r => setAssignments(r.data.data ?? []))
 
   useEffect(() => { load() }, [])
+
+  async function createSelfTask(e: React.FormEvent) {
+    e.preventDefault(); setSelfSaving(true)
+    try {
+      await api.post('/assignments', {
+        title:           selfForm.title,
+        description:     selfForm.description || null,
+        assigned_to:     user?.id,
+        priority:        selfForm.priority,
+        estimated_hours: parseFloat(selfForm.estimated_hours) || 4,
+        deadline:        selfForm.deadline || null,
+      })
+      setMsg({ text: 'Task allocated to yourself — it now counts towards your workload.', ok: true })
+      setShowSelf(false)
+      setSelfForm({ title: '', description: '', priority: 'medium', estimated_hours: '4', deadline: '' })
+      load()
+    } catch (e: any) {
+      setMsg({ text: e.response?.data?.message ?? 'Error', ok: false })
+    } finally { setSelfSaving(false) }
+  }
 
   async function saveProgress(id: number) {
     try {
@@ -32,16 +66,21 @@ export default function DeptHeadMyWorkPage() {
 
   return (
     <DashboardLayout requiredRole="department_head">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white">
-          <HiOutlineBriefcase size={20} />
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white">
+            <HiOutlineBriefcase size={20} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-heading font-bold">My Work</h1>
+            <p className="text-[var(--muted)] text-sm">
+              {active.length} active · {completed.length} completed
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-heading font-bold">My Work</h1>
-          <p className="text-[var(--muted)] text-sm">
-            {active.length} active · {completed.length} completed
-          </p>
-        </div>
+        <button onClick={() => setShowSelf(true)} className="btn-primary">
+          <HiOutlinePlus size={16}/> Allocate Work to Myself
+        </button>
       </div>
 
       {msg && (
@@ -51,6 +90,9 @@ export default function DeptHeadMyWorkPage() {
           {msg.text}
         </div>
       )}
+
+      {/* Overdue & approaching-deadline alerts for my own work (read-only) */}
+      <DeadlineAlerts assignments={assignments} onChanged={load} mode="view" />
 
       {assignments.length === 0 && (
         <div className="glass-card p-10 text-center">
@@ -81,6 +123,51 @@ export default function DeptHeadMyWorkPage() {
               onOpen={() => {}} onPct={() => {}} onNote={() => {}}
               onSave={() => {}} onClose={() => {}} />
           ))}
+        </div>
+      )}
+
+      {/* ---- Self-Allocation Modal ---- */}
+      {showSelf && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="glass-card w-full max-w-md p-6 relative">
+            <button onClick={() => setShowSelf(false)} className="absolute top-4 right-4 text-[var(--muted)]">
+              <HiOutlineXMark size={18}/>
+            </button>
+            <h2 className="font-heading font-semibold text-lg mb-1">Allocate Work to Myself</h2>
+            <p className="text-xs text-[var(--muted)] mb-5">This task will appear in My Work and count towards your weekly capacity.</p>
+            <form onSubmit={createSelfTask} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Title *</label>
+                <input value={selfForm.title} onChange={e=>setSelfForm(f=>({...f,title:e.target.value}))} className="input" required placeholder="e.g. Department budget planning"/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <textarea value={selfForm.description} onChange={e=>setSelfForm(f=>({...f,description:e.target.value}))} className="input" rows={2} placeholder="Optional details…"/>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Priority</label>
+                  <select value={selfForm.priority} onChange={e=>setSelfForm(f=>({...f,priority:e.target.value}))} className="input">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Est. Hours</label>
+                  <input type="number" min="0.5" step="0.5" value={selfForm.estimated_hours} onChange={e=>setSelfForm(f=>({...f,estimated_hours:e.target.value}))} className="input"/>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1">Deadline</label>
+                  <input type="date" min={today} value={selfForm.deadline} onChange={e=>setSelfForm(f=>({...f,deadline:e.target.value}))} className="input"/>
+                </div>
+              </div>
+              <button type="submit" disabled={selfSaving} className="btn-primary w-full justify-center">
+                {selfSaving ? 'Allocating…' : 'Allocate Task'}
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </DashboardLayout>

@@ -27,9 +27,11 @@ class AssignmentDao
             $bind[':faculty_id'] = $filters['faculty_id'];
         }
         if (!empty($filters['dean_scope_faculty_id'])) {
-            $where[] = '(d.faculty_id = :dean_scope_faculty_id OR a.assigned_by = :dean_scope_user_id)';
+            // Faculty's own assignments, OR ones the dean created, OR ones assigned TO the dean themselves
+            $where[] = '(d.faculty_id = :dean_scope_faculty_id OR a.assigned_by = :dean_scope_user_id OR a.assigned_to = :dean_scope_user_id2)';
             $bind[':dean_scope_faculty_id'] = $filters['dean_scope_faculty_id'];
             $bind[':dean_scope_user_id'] = $filters['dean_scope_user_id'];
+            $bind[':dean_scope_user_id2'] = $filters['dean_scope_user_id'];
         }
         if (!empty($filters['status'])) {
             $where[] = 'a.status = :status';
@@ -41,8 +43,8 @@ class AssignmentDao
         }
 
         $sql = 'SELECT a.*,
-                       ut.full_name AS assigned_to_name,
-                       ub.full_name AS assigned_by_name,
+                       ' . UserDao::displayNameSql('ut') . ' AS assigned_to_name,
+                       ' . UserDao::displayNameSql('ub') . ' AS assigned_by_name,
                        d.dept_name,
                        (SELECT MAX(ap.progress_percent) FROM assignment_progress ap WHERE ap.assignment_id = a.id) AS latest_progress
                 FROM assignments a
@@ -61,8 +63,8 @@ class AssignmentDao
     {
         $stmt = Db::connection()->prepare(
             'SELECT a.*,
-                    ut.full_name AS assigned_to_name,
-                    ub.full_name AS assigned_by_name,
+                    ' . UserDao::displayNameSql('ut') . ' AS assigned_to_name,
+                    ' . UserDao::displayNameSql('ub') . ' AS assigned_by_name,
                     d.dept_name
              FROM assignments a
              JOIN users ut ON ut.id = a.assigned_to
@@ -135,7 +137,7 @@ class AssignmentDao
     public static function getProgress(int $assignmentId): array
     {
         $stmt = Db::connection()->prepare(
-            'SELECT ap.*, u.full_name AS updated_by_name
+            'SELECT ap.*, ' . UserDao::displayNameSql('u') . ' AS updated_by_name
              FROM assignment_progress ap
              JOIN users u ON u.id = ap.updated_by
              WHERE ap.assignment_id = :aid

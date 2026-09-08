@@ -17,6 +17,10 @@ class UserController
 
         switch ($auth['role']) {
             case 'system_admin':
+                // Admin can include deactivated accounts (to reactivate or delete them)
+                if (!empty($_GET['include_inactive'])) {
+                    $filters['include_inactive'] = true;
+                }
                 break; // all users
             case 'dean':
                 if (empty($_GET['all_faculties'])) {
@@ -24,7 +28,11 @@ class UserController
                 }
                 break;
             case 'department_head':
-                $filters['department_id'] = $auth['dept'];
+                // Own department by default, but cross-department / cross-faculty
+                // request targeting needs a wider staff directory
+                if (empty($_GET['all_faculties']) && empty($_GET['faculty_id'])) {
+                    $filters['department_id'] = $auth['dept'];
+                }
                 break;
             default:
                 Response::error('Forbidden', 403);
@@ -67,8 +75,6 @@ class UserController
             if (empty($body[$req])) Response::error("Field '$req' is required", 422);
         }
 
-<<<<<<< Updated upstream
-=======
         if (!empty($body['title']) && !in_array($body['title'], UserDao::TITLES, true)) {
             Response::error('Invalid title value', 422);
         }
@@ -80,7 +86,6 @@ class UserController
         }
         PasswordPolicy::enforce((string)$body['password']);
 
->>>>>>> Stashed changes
         $targetRoleId = (int)$body['role_id'];
 
         if ($auth['role'] === 'department_head') {
@@ -104,7 +109,32 @@ class UserController
             }
         }
 
+        // Rule: a department can only have ONE department head
+        if ($targetRoleId === 3 && !empty($body['department_id'])) {
+            $db  = \App\Helpers\Db::connection();
+            $chk = $db->prepare(
+                "SELECT COUNT(*) AS c
+                 FROM users u
+                 JOIN roles r ON r.id = u.role_id
+                 WHERE u.department_id = :did
+                   AND r.role_name = 'department_head'
+                   AND u.is_active = 1"
+            );
+            $chk->execute([':did' => (int)$body['department_id']]);
+            if ((int)$chk->fetch()['c'] > 0) {
+                Response::error('This department already has a Department Head. A department can only have one head.', 422);
+            }
+        }
+
         $userId = UserDao::create($body);
+
+        // Keep departments.head_id in sync when a Department Head account is created
+        if ($targetRoleId === 3 && !empty($body['department_id'])) {
+            \App\Helpers\Db::connection()
+                ->prepare('UPDATE departments SET head_id = :uid WHERE id = :did')
+                ->execute([':uid' => $userId, ':did' => (int)$body['department_id']]);
+        }
+
         AuditLogDao::log($auth['sub'], 'create_user', 'users', $userId);
         Response::success(['id' => $userId], 'User created', 201);
     }
@@ -123,9 +153,6 @@ class UserController
             Response::error('Forbidden', 403);
         }
 
-<<<<<<< Updated upstream
-        $ok = UserDao::update($id, $body);
-=======
         // STRICT ALLOWLIST. The request body used to be forwarded to the DAO
         // wholesale, which let any user set their own `password` (bypassing the
         // current-password check in changePassword), re-enable their own
@@ -165,7 +192,6 @@ class UserController
         }
 
         $ok = UserDao::update($id, $data);
->>>>>>> Stashed changes
         AuditLogDao::log($auth['sub'], 'update_user', 'users', $id);
         Response::success(['updated' => $ok]);
     }
@@ -174,7 +200,19 @@ class UserController
     {
         $auth = JwtMiddleware::handle(['system_admin']);
         $id   = (int)($params['id'] ?? 0);
-        $ok   = UserDao::update($id, ['is_active' => 0]);
+
+        if ($id === (int)$auth['sub']) {
+            Response::error('You cannot deactivate or delete your own account.', 422);
+        }
+
+        // ?permanent=1 → hard delete: remove the user AND everything related to them
+        if (!empty($_GET['permanent'])) {
+            AuditLogDao::log($auth['sub'], 'delete_user_permanent', 'users', $id);
+            $ok = UserDao::hardDelete($id);
+            Response::success(['deleted' => $ok], 'User and all related data permanently deleted');
+        }
+
+        $ok = UserDao::update($id, ['is_active' => 0]);
         AuditLogDao::log($auth['sub'], 'deactivate_user', 'users', $id);
         Response::success(['deactivated' => $ok]);
     }
@@ -191,18 +229,15 @@ class UserController
         } else {
             $newPassword = PasswordPolicy::generateTemporary();
         }
-
+        
         $ok = UserDao::update($id, ['password' => $newPassword]);
         if ($ok) {
-<<<<<<< Updated upstream
-=======
             // Force re-enrollment: an admin-issued password means the old
             // authenticator secret can no longer be trusted as still
             // belonging to whoever logs in with it next.
             UserDao::disableTotp($id);
             // Kill any session the previous password still had open.
             UserDao::bumpTokenVersion($id);
->>>>>>> Stashed changes
             AuditLogDao::log($auth['sub'], 'reset_password', 'users', $id);
             Response::success([
                 'message' => 'Password reset successfully',

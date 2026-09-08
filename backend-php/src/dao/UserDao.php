@@ -11,8 +11,16 @@ class UserDao
     public static function list(array $auth, array $filters = []): array
     {
         $db   = Db::connection();
-        $where = ['u.is_active = 1'];
+        $where = [];
         $bind  = [];
+
+        // By default only active users are listed; admins can request everyone
+        // (needed to see & reactivate deactivated accounts)
+        if (empty($filters['include_inactive'])) {
+            $where[] = 'u.is_active = 1';
+        } else {
+            $where[] = '1=1';
+        }
 
         // Scope: dean → faculty; dept_head → dept; lecturer/student → own only (handled in controller)
         if (isset($filters['department_id'])) {
@@ -20,19 +28,22 @@ class UserDao
             $bind[':dept_id'] = $filters['department_id'];
         }
         if (isset($filters['faculty_id'])) {
-            $where[] = '(d.faculty_id = :faculty_id OR (r.role_name = \'dean\' AND f_dean.id = :faculty_id))';
-            $bind[':faculty_id'] = $filters['faculty_id'];
+            // NOTE: PDO with emulated prepares disabled does not allow reusing the
+            // same named placeholder twice, so two distinct placeholders are used.
+            $where[] = '(d.faculty_id = :faculty_id OR (r.role_name = \'dean\' AND f_dean.id = :faculty_id_dean))';
+            $bind[':faculty_id']      = $filters['faculty_id'];
+            $bind[':faculty_id_dean'] = $filters['faculty_id'];
         }
         if (isset($filters['role_name'])) {
             $where[] = 'r.role_name = :role_name';
             $bind[':role_name'] = $filters['role_name'];
         }
 
-        $sql = 'SELECT u.id, u.full_name, u.email, u.role_id, r.role_name,
+        $sql = 'SELECT u.id, u.full_name, u.title, u.position, u.email, u.role_id, r.role_name,
                        u.department_id, d.dept_name,
                        COALESCE(d.faculty_id, f_dean.id) AS faculty_id,
                        COALESCE(f.faculty_name, f_dean.faculty_name) AS faculty_name,
-                       u.capacity_hours, u.contact, u.enrollment_number, u.is_active, u.created_at
+                       u.capacity_hours, u.operational_status, u.contact, u.enrollment_number, u.is_active, u.totp_enabled, u.created_at
                 FROM users u
                 JOIN roles r ON r.id = u.role_id
                 LEFT JOIN departments d ON d.id = u.department_id
@@ -50,11 +61,11 @@ class UserDao
     {
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'SELECT u.id, u.full_name, u.email, u.role_id, r.role_name,
+            'SELECT u.id, u.full_name, u.title, u.position, u.email, u.role_id, r.role_name,
                     u.department_id, d.dept_name,
                     COALESCE(d.faculty_id, f_dean.id) AS faculty_id,
                     COALESCE(f.faculty_name, f_dean.faculty_name) AS faculty_name,
-                    u.capacity_hours, u.contact, u.enrollment_number, u.is_active, u.created_at
+                    u.capacity_hours, u.operational_status, u.contact, u.enrollment_number, u.is_active, u.totp_enabled, u.created_at
              FROM users u
              JOIN roles r ON r.id = u.role_id
              LEFT JOIN departments d ON d.id = u.department_id
@@ -76,17 +87,78 @@ class UserDao
         return $row ?: null;
     }
 
+    /**
+     * Resolve the Department Head's user id for a department.
+     * Prefers departments.head_id, but falls back to looking up the active
+     * user with the department_head role in that department (head_id is not
+     * always maintained when heads are created directly).
+     */
+    public static function departmentHeadId(int $departmentId): ?int
+    {
+        if (!$departmentId) return null;
+        $db = Db::connection();
+
+        $stmt = $db->prepare('SELECT head_id FROM departments WHERE id = :did');
+        $stmt->execute([':did' => $departmentId]);
+        $row = $stmt->fetch();
+        if ($row && $row['head_id']) return (int)$row['head_id'];
+
+        $stmt = $db->prepare(
+            "SELECT u.id FROM users u
+             JOIN roles r ON r.id = u.role_id
+             WHERE u.department_id = :did
+               AND r.role_name = 'department_head'
+               AND u.is_active = 1
+             LIMIT 1"
+        );
+        $stmt->execute([':did' => $departmentId]);
+        $row = $stmt->fetch();
+        return $row ? (int)$row['id'] : null;
+    }
+
+    /**
+     * SQL expression producing a display name with the honorific title
+     * prefixed, e.g. "Dr. Jane Silva". Falls back to full_name when title
+     * is NULL. Note: this uses `title` (the honorific), NOT `position`
+     * (the academic rank) — a "Senior Lecturer" is not a name prefix.
+     */
+    public static function displayNameSql(string $alias): string
+    {
+        return "TRIM(CONCAT(COALESCE(CONCAT($alias.title, '. '), ''), $alias.full_name))";
+    }
+
+    /** Allowed honorific titles / name prefixes (dropdown on the frontend) */
+    public const TITLES = [
+        'Prof', 'Dr', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero',
+    ];
+
+    /** Allowed academic ranks / job positions (dropdown on the frontend) */
+    public const POSITIONS = [
+        'Senior Professor', 'Professor', 'Associate Professor',
+        'Senior Lecturer', 'Senior Lecturer (Grade I)', 'Senior Lecturer (Grade II)',
+        'Lecturer', 'Lecturer (Grade I)', 'Lecturer (Grade II)',
+        'Probationary Lecturer', 'Assistant Lecturer', 'Temporary Lecturer',
+        'Visiting Lecturer', 'Instructor', 'Demonstrator', 'Research Assistant',
+    ];
+
+    /** Allowed lecturer operational (availability) statuses */
+    public const OPERATIONAL_STATUSES = [
+        'Available', 'On Study Leave', 'Temporarily Not Available', 'On Vacation',
+    ];
+
     public static function create(array $data): int
     {
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'INSERT INTO users (full_name, email, password_hash, role_id, department_id,
+            'INSERT INTO users (full_name, title, position, email, password_hash, role_id, department_id,
                                 enrollment_number, contact, capacity_hours)
-             VALUES (:full_name, :email, :password_hash, :role_id, :department_id,
+             VALUES (:full_name, :title, :position, :email, :password_hash, :role_id, :department_id,
                      :enrollment_number, :contact, :capacity_hours)'
         );
         $stmt->execute([
             ':full_name'         => $data['full_name'],
+            ':title'             => $data['title'] ?? null,
+            ':position'          => $data['position'] ?? null,
             ':email'             => $data['email'],
             ':password_hash'     => password_hash($data['password'], PASSWORD_BCRYPT, ['cost' => 12]),
             ':role_id'           => $data['role_id'],
@@ -104,7 +176,7 @@ class UserDao
         $fields = [];
         $bind   = [':id' => $id];
 
-        foreach (['full_name','email','contact','capacity_hours','department_id','is_active'] as $col) {
+        foreach (['full_name','title','position','email','contact','capacity_hours','operational_status','department_id','is_active'] as $col) {
             if (array_key_exists($col, $data)) {
                 $fields[] = "$col = :$col";
                 $bind[":$col"] = $data[$col];
@@ -122,6 +194,69 @@ class UserDao
         return $stmt->rowCount() > 0;
     }
 
+    /**
+     * PERMANENTLY delete a user and everything related to them.
+     * Runs in a transaction so it's all-or-nothing.
+     */
+    public static function hardDelete(int $id): bool
+    {
+        $db = Db::connection();
+        $db->beginTransaction();
+        try {
+            // 1. Progress logs — theirs, and those on assignments being removed
+            $db->prepare(
+                'DELETE FROM assignment_progress
+                 WHERE updated_by = :uid
+                    OR assignment_id IN (SELECT id FROM assignments WHERE assigned_to = :uid2 OR assigned_by = :uid3)'
+            )->execute([':uid' => $id, ':uid2' => $id, ':uid3' => $id]);
+
+            // 2. Assignments they were given or created
+            $db->prepare('DELETE FROM assignments WHERE assigned_to = :uid OR assigned_by = :uid2')
+               ->execute([':uid' => $id, ':uid2' => $id]);
+
+            // 3. Workload appeals they submitted (+ detach ones they reviewed)
+            $db->prepare('UPDATE workload_appeals SET reviewed_by = NULL WHERE reviewed_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM workload_appeals WHERE lecturer_id = :uid')->execute([':uid' => $id]);
+
+            // 4. Work requests they made (+ detach where they were target/approver)
+            $db->prepare('UPDATE work_requests SET target_user_id = NULL WHERE target_user_id = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE work_requests SET resolved_by = NULL WHERE resolved_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE work_requests SET dean_approved_by = NULL WHERE dean_approved_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE work_requests SET dept_head_approved_by = NULL WHERE dept_head_approved_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM work_requests WHERE requester_id = :uid')->execute([':uid' => $id]);
+
+            // 5. Student requests they submitted (+ detach where supervisor/reviewer)
+            $db->prepare('UPDATE student_requests SET assigned_to = NULL WHERE assigned_to = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE student_requests SET reviewed_by = NULL WHERE reviewed_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM student_requests WHERE student_id = :uid')->execute([':uid' => $id]);
+
+            // 6. Role promotions about them (+ detach where they promoted/approved others)
+            $db->prepare('UPDATE role_promotions SET promoted_by = NULL WHERE promoted_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE role_promotions SET approved_by = NULL WHERE approved_by = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM role_promotions WHERE user_id = :uid')->execute([':uid' => $id]);
+
+            // 7. Notifications & audit logs
+            $db->prepare('DELETE FROM notifications WHERE user_id = :uid')->execute([':uid' => $id]);
+            $db->prepare('DELETE FROM audit_logs WHERE user_id = :uid')->execute([':uid' => $id]);
+
+            // 8. Leadership references & settings
+            $db->prepare('UPDATE faculties SET dean_id = NULL WHERE dean_id = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE departments SET head_id = NULL WHERE head_id = :uid')->execute([':uid' => $id]);
+            $db->prepare('UPDATE settings SET updated_by = NULL WHERE updated_by = :uid')->execute([':uid' => $id]);
+
+            // 9. Finally, the user record itself
+            $stmt = $db->prepare('DELETE FROM users WHERE id = :uid');
+            $stmt->execute([':uid' => $id]);
+            $deleted = $stmt->rowCount() > 0;
+
+            $db->commit();
+            return $deleted;
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
+
     public static function roleIdByName(string $name): ?int
     {
         $stmt = Db::connection()->prepare('SELECT id FROM roles WHERE role_name = :name');
@@ -129,8 +264,6 @@ class UserDao
         $row = $stmt->fetch();
         return $row ? (int)$row['id'] : null;
     }
-<<<<<<< Updated upstream
-=======
 
     // ------------------------------------------------------------
     // TOTP self-service password recovery
@@ -262,5 +395,4 @@ class UserDao
             'UPDATE users SET totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = :id'
         )->execute([':id' => $id]);
     }
->>>>>>> Stashed changes
 }

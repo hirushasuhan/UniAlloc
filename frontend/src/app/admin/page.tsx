@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { api } from '@/lib/api'
 import DashboardBanner from '@/components/ui/DashboardBanner'
-import { HiOutlineUsers, HiOutlineBookOpen, HiOutlineChartBar, HiOutlineDocumentText } from 'react-icons/hi2'
+import { HiOutlineUsers, HiOutlineBookOpen, HiOutlineChartBar, HiOutlineDocumentText, HiOutlineExclamationTriangle } from 'react-icons/hi2'
+import Link from 'next/link'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ users: 0, faculties: 0, departments: 0, assignments: 0 })
   const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [vac, setVac] = useState<{ faculties_without_dean: any[]; departments_without_head: any[] }>({ faculties_without_dean: [], departments_without_head: [] })
 
   useEffect(() => {
     Promise.all([
@@ -16,7 +18,8 @@ export default function AdminDashboard() {
       api.get('/departments').catch(() => ({ data: { data: [] } })),
       api.get('/assignments').catch(() => ({ data: { data: [] } })),
       api.get('/audit-logs?limit=10').catch(() => ({ data: { data: [] } })),
-    ]).then(([users, facs, depts, asgns, logs]) => {
+      api.get('/vacancies').catch(() => ({ data: { data: { faculties_without_dean: [], departments_without_head: [] } } })),
+    ]).then(([users, facs, depts, asgns, logs, vacRes]) => {
       setStats({
         users:       users.data.data?.length ?? 0,
         faculties:   facs.data.data?.length  ?? 0,
@@ -24,6 +27,7 @@ export default function AdminDashboard() {
         assignments: asgns.data.data?.length  ?? 0,
       })
       setAuditLogs(logs.data.data ?? [])
+      setVac(vacRes.data.data ?? { faculties_without_dean: [], departments_without_head: [] })
     })
   }, [])
 
@@ -39,6 +43,48 @@ export default function AdminDashboard() {
       <DashboardBanner />
       <h1 className="text-2xl font-heading font-bold mb-2">System Admin Dashboard</h1>
       <p className="text-[var(--muted)] text-sm mb-8">Full platform overview and control</p>
+
+      {/* Leadership vacancy alerts */}
+      {(vac.faculties_without_dean.length > 0 || vac.departments_without_head.length > 0) && (
+        <div className="mb-8 space-y-3">
+          {vac.faculties_without_dean.length > 0 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-sm">
+                <HiOutlineExclamationTriangle size={18}/> Faculties without an active Dean
+              </div>
+              <ul className="mt-2 space-y-1 text-sm">
+                {vac.faculties_without_dean.map((f: any) => (
+                  <li key={f.id}>
+                    <span className="font-medium">{f.faculty_name}</span>
+                    <span className="text-[var(--muted)]"> — no Dean assigned. Please assign someone.</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/admin/promotions" className="inline-block mt-2 text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline">
+                Go to Role Management →
+              </Link>
+            </div>
+          )}
+          {vac.departments_without_head.length > 0 && (
+            <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-3">
+              <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 font-semibold text-sm">
+                <HiOutlineExclamationTriangle size={18}/> Departments without an active Head
+              </div>
+              <ul className="mt-2 space-y-1 text-sm">
+                {vac.departments_without_head.map((d: any) => (
+                  <li key={d.id}>
+                    <span className="font-medium">{d.dept_name}</span>
+                    <span className="text-[var(--muted)]"> ({d.faculty_name}) — no Head assigned. Please assign someone.</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/admin/promotions" className="inline-block mt-2 text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline">
+                Go to Role Management →
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

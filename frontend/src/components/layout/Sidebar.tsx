@@ -33,6 +33,7 @@ function navItems(role: string): NavItem[] {
       { href: '/department-head/assignments', label: 'Assignments', icon: <HiOutlineClipboardDocumentList size={18}/> },
       { href: '/department-head/workload',    label: 'Workload',    icon: <HiOutlineChartBar size={18}/> },
       { href: '/department-head/requests',    label: 'Requests',    icon: <HiOutlinePaperAirplane size={18}/> },
+      { href: '/department-head/student-requests', label: 'Student Requests', icon: <HiOutlineUsers size={18}/> },
       { href: '/department-head/appeals',     label: 'Appeals',     icon: <HiOutlineDocumentText size={18}/> },
       { href: '/department-head/my-work',     label: 'My Work',     icon: <HiOutlineBriefcase size={18}/> },
     ],

@@ -383,6 +383,7 @@ CREATE TABLE `student_requests` (
 CREATE TABLE `users` (
   `id` int(10) UNSIGNED NOT NULL,
   `full_name` varchar(200) NOT NULL,
+  `position` varchar(50) DEFAULT NULL COMMENT 'Academic/professional title, e.g. Senior Prof, Prof, Senior Lecturer, Lecturer, Mr, Ms, Miss, Thero',
   `email` varchar(200) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `role_id` tinyint(3) UNSIGNED NOT NULL,

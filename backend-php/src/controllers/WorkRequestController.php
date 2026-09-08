@@ -35,8 +35,8 @@ class WorkRequestController
                 // Admin sees all — special case, no filter → skip DAO and return all
                 $stmt = Db::connection()->prepare(
                     'SELECT wr.*,
-                            ur.full_name   AS requester_name,
-                            ut.full_name   AS target_user_name,
+                            ' . UserDao::displayNameSql('ur') . ' AS requester_name,
+                            ' . UserDao::displayNameSql('ut') . ' AS target_user_name,
                             d.dept_name    AS target_dept_name,
                             f.faculty_name AS target_faculty_name
                      FROM work_requests wr
@@ -95,10 +95,10 @@ class WorkRequestController
     // and the correct initial approval_step.
     //
     // Approval-step rules:
-    //   cross_faculty + target=lecturer    → pending_dean
-    //   cross_faculty + target=dept_head   → pending_dean
-    //   cross_faculty + target=dean        → pending_assignee
-    //   cross_department + target=lecturer → pending_dept_head
+    //   cross_faculty + target=lecturer    → pending_dept_head → pending_dean → pending_assignee
+    //   cross_faculty + target=dept_head   → pending_dept_head → pending_dean → (assigned)
+    //   cross_faculty + target=dean        → pending_assignee (direct to that dean)
+    //   cross_department + target=lecturer → pending_dept_head → pending_assignee
     //   cross_department + target=dept_head→ pending_assignee
     //   upward (to dean)                   → pending_assignee
     // ------------------------------------------------------------------
@@ -150,6 +150,19 @@ class WorkRequestController
             $stmt->execute([':uid' => $targetUserId]);
             $row = $stmt->fetch();
             if ($row) $targetFacultyId = (int)$row['id'];
+        }
+
+        // ---- Validation: no self / own-scope targeting ------------------
+        if ($targetUserId === (int)$auth['sub']) {
+            Response::error('You cannot send a work request to yourself.', 422);
+        }
+        if ($requestType === 'cross_faculty' && $targetFacultyId
+            && (int)($auth['faculty'] ?? 0) === $targetFacultyId) {
+            Response::error('Cross-faculty requests cannot target your own faculty. Use a cross-department request or assign the work directly.', 422);
+        }
+        if ($requestType === 'cross_department' && $targetDeptId
+            && (int)($auth['dept'] ?? 0) === $targetDeptId) {
+            Response::error('Cross-department requests cannot target your own department. Assign the work directly instead.', 422);
         }
 
         // Determine initial approval step
@@ -218,50 +231,71 @@ class WorkRequestController
         $ok = false;
 
         switch ($step) {
-            case 'pending_dean':
-                // Only the dean of the target faculty may approve
-                if ($auth['role'] !== 'dean') Response::error('Only the target faculty dean can approve here', 403);
-                if ((int)($auth['faculty'] ?? 0) !== (int)($req['target_faculty_id'] ?? -1)) {
-                    Response::error('You are not the dean of the target faculty', 403);
-                }
-
-                if ($req['target_role'] === 'lecturer') {
-                    // Advance to dept-head step
-                    $ok = WorkRequestDao::advanceToDeptHead($id, $auth['sub']);
-                    // Notify that dept head
-                    $deptHeadId = $this->getDeptHeadForUser((int)$req['target_user_id']);
-                    if ($deptHeadId) {
-                        NotificationDao::create(
-                            $deptHeadId,
-                            "Work request \"{$req['title']}\" needs your department's approval.",
-                            'request'
-                        );
-                    }
-                } else {
-                    // dept_head target → advance straight to assignee
-                    $ok = WorkRequestDao::advanceToAssignee($id, $auth['sub'], 'dean');
-                    NotificationDao::create(
-                        (int)$req['target_user_id'],
-                        "Work request \"{$req['title']}\" has been approved by the Dean and is awaiting your acceptance.",
-                        'request'
-                    );
-                }
-                break;
-
             case 'pending_dept_head':
-                // Only the dept head whose dept contains the target lecturer
+                // The target's Department Head acts first. For a department-head
+                // target this is the target themselves accepting.
                 if ($auth['role'] !== 'department_head') {
                     Response::error('Only the department head can approve here', 403);
                 }
                 if ((int)($auth['dept'] ?? 0) !== (int)($req['target_dept_id'] ?? -1)) {
                     Response::error('You are not the head of the target department', 403);
                 }
-                $ok = WorkRequestDao::advanceToAssignee($id, $auth['sub'], 'dept_head');
-                NotificationDao::create(
-                    (int)$req['target_user_id'],
-                    "Work request \"{$req['title']}\" has been fully approved and is awaiting your acceptance.",
-                    'request'
-                );
+
+                if ($req['request_type'] === 'cross_faculty') {
+                    // HOD approved → now the target faculty's Dean must approve
+                    $ok = WorkRequestDao::advanceToDean($id, $auth['sub']);
+                    $deanId = $this->getDeanForFaculty((int)($req['target_faculty_id'] ?? 0));
+                    if ($deanId) {
+                        NotificationDao::create(
+                            $deanId,
+                            "Work request \"{$req['title']}\" has your department head's approval and now needs your (Dean) approval.",
+                            'request'
+                        );
+                    }
+                } else {
+                    // cross_department → straight to the assignee
+                    $ok = WorkRequestDao::advanceToAssignee($id, $auth['sub'], 'dept_head');
+                    NotificationDao::create(
+                        (int)$req['target_user_id'],
+                        "Work request \"{$req['title']}\" has been fully approved and is awaiting your acceptance.",
+                        'request'
+                    );
+                }
+                break;
+
+            case 'pending_dean':
+                // The target faculty's Dean approves (after the dept head).
+                if ($auth['role'] !== 'dean') Response::error('Only the target faculty dean can approve here', 403);
+                if ((int)($auth['faculty'] ?? 0) !== (int)($req['target_faculty_id'] ?? -1)) {
+                    Response::error('You are not the dean of the target faculty', 403);
+                }
+
+                if ($req['target_role'] === 'department_head') {
+                    // The target head already accepted at the dept-head step →
+                    // dean approval is final; assign the work now.
+                    $ok = WorkRequestDao::deanFinalApprove($id, $auth['sub']);
+                    if ($ok) {
+                        $this->createAssignmentFromRequest($req);
+                        NotificationDao::create(
+                            (int)$req['target_user_id'],
+                            "Work request \"{$req['title']}\" was approved by the Dean and has been assigned to you.",
+                            'request'
+                        );
+                        NotificationDao::create(
+                            (int)$req['requester_id'],
+                            "Your work request \"{$req['title']}\" was fully approved.",
+                            'request'
+                        );
+                    }
+                } else {
+                    // lecturer target → the lecturer must still accept
+                    $ok = WorkRequestDao::advanceToAssignee($id, $auth['sub'], 'dean');
+                    NotificationDao::create(
+                        (int)$req['target_user_id'],
+                        "Work request \"{$req['title']}\" has been fully approved and is awaiting your acceptance.",
+                        'request'
+                    );
+                }
                 break;
 
             case 'pending_assignee':
@@ -298,9 +332,11 @@ class WorkRequestController
     private function determineInitialStep(string $requestType, string $targetRole): string
     {
         if ($requestType === 'cross_faculty') {
+            // A dean is requested directly (no chain).
             if ($targetRole === 'dean') return 'pending_assignee';
-            // lecturer or department_head → dean approval first
-            return 'pending_dean';
+            // lecturer or department_head → the target's Dept Head approves
+            // FIRST, then their Dean, then (for a lecturer) the lecturer accepts.
+            return 'pending_dept_head';
         }
 
         if ($requestType === 'cross_department') {
@@ -330,14 +366,10 @@ class WorkRequestController
                 );
             }
         } elseif ($step === 'pending_dept_head' && !empty($data['target_dept_id'])) {
-            $stmt = Db::connection()->prepare(
-                'SELECT head_id FROM departments WHERE id = :did'
-            );
-            $stmt->execute([':did' => $data['target_dept_id']]);
-            $row = $stmt->fetch();
-            if ($row && $row['head_id']) {
+            $headId = UserDao::departmentHeadId((int)$data['target_dept_id']);
+            if ($headId) {
                 NotificationDao::create(
-                    (int)$row['head_id'],
+                    $headId,
                     "New work request \"{$data['title']}\" requires your department's approval.",
                     'request'
                 );
@@ -351,16 +383,24 @@ class WorkRequestController
         }
     }
 
+    private function getDeanForFaculty(int $facultyId): ?int
+    {
+        if (!$facultyId) return null;
+        $stmt = Db::connection()->prepare('SELECT dean_id FROM faculties WHERE id = :fid');
+        $stmt->execute([':fid' => $facultyId]);
+        $row = $stmt->fetch();
+        return $row && $row['dean_id'] ? (int)$row['dean_id'] : null;
+    }
+
     private function getDeptHeadForUser(int $userId): ?int
     {
         $stmt = Db::connection()->prepare(
-            'SELECT d.head_id FROM users u
-             JOIN departments d ON d.id = u.department_id
-             WHERE u.id = :uid'
+            'SELECT department_id FROM users WHERE id = :uid'
         );
         $stmt->execute([':uid' => $userId]);
         $row = $stmt->fetch();
-        return $row && $row['head_id'] ? (int)$row['head_id'] : null;
+        if (!$row || !$row['department_id']) return null;
+        return UserDao::departmentHeadId((int)$row['department_id']);
     }
 
     private function resolveUpwardTarget(array $auth): ?int

@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS `departments` (
 CREATE TABLE IF NOT EXISTS `users` (
   `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `full_name`         VARCHAR(200) NOT NULL,
+  `title`             VARCHAR(20)  NULL DEFAULT NULL COMMENT 'Honorific prefix shown before the name, e.g. Dr, Prof, Mr, Mrs, Ms, Miss, Rev, Thero',
+  `position`          VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Academic rank / job position (full allowed list in UserDao::POSITIONS), e.g. Senior/Associate Professor, Senior Lecturer (Grade I/II), Lecturer (Grade I/II), Probationary/Assistant/Temporary/Visiting Lecturer, Instructor, Demonstrator, Research Assistant. Independent of title (a person can be Dr. AND a Senior Lecturer).',
   `email`             VARCHAR(200) NOT NULL UNIQUE,
   `password_hash`     VARCHAR(255) NOT NULL,
   `role_id`           TINYINT UNSIGNED NOT NULL,
@@ -56,6 +58,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `enrollment_number` VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Students only',
   `contact`           VARCHAR(50)  NULL DEFAULT NULL,
   `capacity_hours`    DECIMAL(6,2) NOT NULL DEFAULT 40.00 COMMENT 'Weekly available hours',
+  `operational_status` VARCHAR(30) NOT NULL DEFAULT 'Available' COMMENT 'Lecturer availability: Available, On Study Leave, Temporarily Not Available, On Vacation',
   `is_active`         TINYINT(1)   NOT NULL DEFAULT 1,
   `created_at`        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
