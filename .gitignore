@@ -23,6 +23,10 @@ frontend/out/
 *.env
 *.env.*
 
+# ...but the templates (placeholders only, no real secrets) MUST be committed
+!.env.example
+!**/.env.example
+
 # PHP / Composer (if added later)
 vendor/
 

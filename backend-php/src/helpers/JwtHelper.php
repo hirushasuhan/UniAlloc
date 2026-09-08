@@ -7,6 +7,25 @@ namespace App\Helpers;
 
 class JwtHelper
 {
+    /**
+     * A missing or trivially short signing key would let anyone forge tokens,
+     * so refuse to run at all rather than degrade silently.
+     */
+    private static function secret(array $cfg): string
+    {
+        $secret = (string)($cfg['jwt_secret'] ?? '');
+        if (strlen($secret) < 32) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Server misconfigured: JWT_SECRET is missing or too short. Set it in backend-php/.env (see .env.example).',
+            ]);
+            exit;
+        }
+        return $secret;
+    }
+
     private static function base64UrlEncode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
@@ -19,8 +38,8 @@ class JwtHelper
 
     public static function generate(array $payload): string
     {
-        $cfg = require __DIR__ . '/../../config/app.php';
-        $secret = $cfg['jwt_secret'];
+        $cfg    = require __DIR__ . '/../../config/app.php';
+        $secret = self::secret($cfg);
         $ttl    = (int)$cfg['jwt_ttl'] * 60; // convert minutes to seconds
 
         $header  = self::base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
@@ -41,7 +60,7 @@ class JwtHelper
     public static function validate(string $token): ?array
     {
         $cfg    = require __DIR__ . '/../../config/app.php';
-        $secret = $cfg['jwt_secret'];
+        $secret = self::secret($cfg);
 
         $parts = explode('.', $token);
         if (count($parts) !== 3) {

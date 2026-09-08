@@ -7,7 +7,9 @@ use App\Helpers\Response;
 use App\Helpers\Totp;
 use App\Middleware\JwtMiddleware;
 use App\Dao\AuditLogDao;
+use App\Dao\LoginAttemptDao;
 use App\Dao\UserDao;
+use App\Helpers\PasswordPolicy;
 
 class AuthController
 {
@@ -21,9 +23,17 @@ class AuthController
             Response::error('Email and password are required', 422);
         }
 
+        $ip = LoginAttemptDao::clientIp();
+        if (LoginAttemptDao::isThrottled($email, $ip)) {
+            Response::error(
+                'Too many failed sign-in attempts. Please wait ' . LoginAttemptDao::WINDOW_MINUTES . ' minutes and try again.',
+                429
+            );
+        }
+
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'SELECT u.id, u.full_name, u.title, u.position, u.email, u.password_hash, u.is_active, u.totp_enabled,
+            'SELECT u.id, u.full_name, u.title, u.position, u.email, u.password_hash, u.is_active, u.totp_enabled, u.token_version,
                     u.capacity_hours, u.operational_status, u.department_id, u.enrollment_number,
                     r.role_name,
                     d.faculty_id,
@@ -39,12 +49,17 @@ class AuthController
         $user = $stmt->fetch();
 
         if (!$user || !password_verify($pass, $user['password_hash'])) {
+            LoginAttemptDao::record($email, $ip, false);
             Response::error('Invalid credentials', 401);
         }
 
         if (!$user['is_active']) {
+            LoginAttemptDao::record($email, $ip, false);
             Response::error('Account is deactivated. Contact the system administrator.', 403);
         }
+
+        LoginAttemptDao::record($email, $ip, true);
+        LoginAttemptDao::clearFailures($email);
 
         // For deans, look up faculty_id from faculties table
         $facultyId = $user['faculty_id'];
@@ -65,6 +80,7 @@ class AuthController
             'dept'         => $user['department_id'] ? (int)$user['department_id'] : null,
             'faculty'      => $facultyId ? (int)$facultyId : null,
             'faculty_name' => $facultyName,
+            'tv'           => (int)$user['token_version'],
         ];
 
         $token = JwtHelper::generate($payload);
@@ -110,6 +126,27 @@ class AuthController
             Response::error('All fields (Full Name, Email, Password, Department, Enrollment Number) are required', 422);
         }
 
+        // Registration is public, so it gets the same throttling as login.
+        $ip = LoginAttemptDao::clientIp();
+        if (LoginAttemptDao::isThrottled('register:' . $ip, $ip)) {
+            Response::error('Too many registration attempts. Please try again later.', 429);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            LoginAttemptDao::record('register:' . $ip, $ip, false);
+            Response::error('Invalid email address', 422);
+        }
+
+        // Optionally restrict self-registration to the institution's domain.
+        $cfg    = require __DIR__ . '/../../config/app.php';
+        $domain = trim((string)($cfg['registration_domain'] ?? ''));
+        if ($domain !== '' && !str_ends_with(strtolower($email), '@' . strtolower($domain))) {
+            LoginAttemptDao::record('register:' . $ip, $ip, false);
+            Response::error("Registration is limited to @$domain email addresses.", 422);
+        }
+
+        PasswordPolicy::enforce($pass);
+
         $db = Db::connection();
 
         // Check if email or enrollment number exists
@@ -150,7 +187,7 @@ class AuthController
 
             // Auto-login logic
             $stmt = $db->prepare(
-                'SELECT u.id, u.full_name, u.email, u.department_id, u.enrollment_number, u.totp_enabled,
+                'SELECT u.id, u.full_name, u.email, u.department_id, u.enrollment_number, u.totp_enabled, u.token_version,
                         r.role_name, d.faculty_id, f.faculty_name
                  FROM users u
                  JOIN roles r ON r.id = u.role_id
@@ -173,6 +210,7 @@ class AuthController
                 'dept'         => $user['department_id'] ? (int)$user['department_id'] : null,
                 'faculty'      => $facultyId,
                 'faculty_name' => $facultyName,
+                'tv'           => (int)$user['token_version'],
             ];
 
             $token = JwtHelper::generate($payload);
@@ -197,7 +235,12 @@ class AuthController
 
         } catch (\Exception $e) {
             $db->rollBack();
-            Response::error('Failed to register user: ' . $e->getMessage(), 500);
+            error_log('[UniAlloc] Registration failed: ' . $e->getMessage());
+            $debug = !empty((require __DIR__ . '/../../config/app.php')['debug']);
+            Response::error(
+                $debug ? 'Failed to register user: ' . $e->getMessage() : 'Registration could not be completed. Please try again.',
+                500
+            );
         }
     }
 
@@ -208,7 +251,8 @@ class AuthController
     /** Starts (or restarts) authenticator enrollment for the logged-in user. */
     public function totpSetup(array $params = []): void
     {
-        $auth   = JwtMiddleware::handle(); // any authenticated user
+        // requireTotp:false — this IS the enrollment endpoint
+        $auth   = JwtMiddleware::handle([], false);
         $secret = Totp::generateSecret();
         UserDao::saveTotpSecret((int)$auth['sub'], $secret);
 
@@ -221,7 +265,8 @@ class AuthController
     /** Confirms enrollment: the user proves they scanned/typed the secret correctly. */
     public function totpVerify(array $params = []): void
     {
-        $auth = JwtMiddleware::handle();
+        // requireTotp:false — this IS the enrollment endpoint
+        $auth = JwtMiddleware::handle([], false);
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $code = trim((string)($body['code'] ?? ''));
 
@@ -268,9 +313,10 @@ class AuthController
         $code        = trim((string)($body['code'] ?? ''));
         $newPassword = (string)($body['new_password'] ?? '');
 
-        if (!$email || !$code || strlen($newPassword) < 8) {
-            Response::error('Email, authenticator code, and a new password (min 8 characters) are required', 422);
+        if (!$email || !$code || $newPassword === '') {
+            Response::error('Email, authenticator code, and a new password are required', 422);
         }
+        PasswordPolicy::enforce($newPassword);
 
         $user = UserDao::findByEmailForRecovery($email);
         if (!$user || !$user['is_active'] || !$user['totp_enabled']) {
@@ -288,6 +334,8 @@ class AuthController
 
         UserDao::clearTotpFailures((int)$user['id']);
         UserDao::update((int)$user['id'], ['password' => $newPassword]);
+        // Revoke any session already holding the OLD password's token.
+        UserDao::bumpTokenVersion((int)$user['id']);
         AuditLogDao::log((int)$user['id'], 'self_reset_password', 'users', (int)$user['id']);
 
         Response::success(['message' => 'Password reset successfully'], 'Password reset successfully');

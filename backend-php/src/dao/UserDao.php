@@ -1,6 +1,7 @@
 <?php
 namespace App\Dao;
 
+use App\Helpers\Crypto;
 use App\Helpers\Db;
 use PDO;
 
@@ -268,13 +269,61 @@ class UserDao
     // TOTP self-service password recovery
     // ------------------------------------------------------------
 
+    // ------------------------------------------------------------
+    // Session security
+    // ------------------------------------------------------------
+
+    /**
+     * Everything JwtMiddleware needs to re-authorise a request against the
+     * live database rather than trusting stale claims inside the token:
+     * account status, current role/scope, token version and TOTP enrollment.
+     */
+    public static function findSecurityState(int $id): ?array
+    {
+        $stmt = Db::connection()->prepare(
+            'SELECT u.id, u.is_active, u.department_id, u.token_version, u.totp_enabled,
+                    r.role_name,
+                    COALESCE(d.faculty_id, f_dean.id) AS faculty_id
+             FROM users u
+             JOIN roles r ON r.id = u.role_id
+             LEFT JOIN departments d ON d.id = u.department_id
+             LEFT JOIN faculties f_dean ON f_dean.dean_id = u.id
+             WHERE u.id = :id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    /** Uniqueness guard for profile email edits (the column is UNIQUE in MySQL). */
+    public static function emailTakenByOther(string $email, int $excludeUserId): bool
+    {
+        $stmt = Db::connection()->prepare('SELECT id FROM users WHERE email = :email AND id <> :id LIMIT 1');
+        $stmt->execute([':email' => $email, ':id' => $excludeUserId]);
+        return (bool)$stmt->fetch();
+    }
+
+    /**
+     * Invalidates every JWT already issued to this user. Called whenever the
+     * password changes, so a stolen token dies with the old credential.
+     */
+    public static function bumpTokenVersion(int $id): void
+    {
+        Db::connection()
+          ->prepare('UPDATE users SET token_version = token_version + 1 WHERE id = :id')
+          ->execute([':id' => $id]);
+    }
+
     /** Auth-only lookup for the TOTP setup/verify endpoints (already-logged-in user). */
     public static function findAuthById(int $id): ?array
     {
         $stmt = Db::connection()->prepare('SELECT id, email, totp_secret, totp_enabled FROM users WHERE id = :id');
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();
-        return $row ?: null;
+        if (!$row) return null;
+        $row['totp_secret'] = Crypto::decrypt($row['totp_secret']);
+        return $row;
     }
 
     /** Public lookup by email for the (unauthenticated) forgot-password flow. */
@@ -286,7 +335,9 @@ class UserDao
         );
         $stmt->execute([':email' => $email]);
         $row = $stmt->fetch();
-        return $row ?: null;
+        if (!$row) return null;
+        $row['totp_secret'] = Crypto::decrypt($row['totp_secret']);
+        return $row;
     }
 
     /** Stores a freshly generated (unconfirmed) secret — not active until verified. */
@@ -294,7 +345,7 @@ class UserDao
     {
         Db::connection()->prepare(
             'UPDATE users SET totp_secret = :secret, totp_enabled = 0, totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = :id'
-        )->execute([':secret' => $secret, ':id' => $id]);
+        )->execute([':secret' => Crypto::encrypt($secret), ':id' => $id]);
     }
 
     /** Confirms enrollment once the user has proven they hold the secret. */

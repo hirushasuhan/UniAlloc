@@ -1,14 +1,19 @@
 <?php
 // ============================================================
 // UniAlloc — PDO Database Configuration
-// Edit the credentials below to match your MySQL setup
+// ------------------------------------------------------------
+// Credentials come from backend-php/.env (gitignored).
+// This file is safe to commit: it contains no credentials.
 // ============================================================
 
+require_once __DIR__ . '/../src/helpers/Env.php';
+\App\Helpers\Env::load(__DIR__ . '/../.env');
+
 return [
-    'host' => '127.0.0.1',
-    'port' => 3306,
-    'dbname' => 'uniAlloc_db',
-    'username' => 'root',
-    'password' => '',                  // ← change this if you set a password for root
-    'charset' => 'utf8mb4',
+    'host'     => \App\Helpers\Env::get('DB_HOST', '127.0.0.1'),
+    'port'     => \App\Helpers\Env::int('DB_PORT', 3306),
+    'dbname'   => \App\Helpers\Env::get('DB_NAME', 'uniAlloc_db'),
+    'username' => \App\Helpers\Env::get('DB_USER', 'root'),
+    'password' => \App\Helpers\Env::get('DB_PASSWORD', ''),
+    'charset'  => \App\Helpers\Env::get('DB_CHARSET', 'utf8mb4'),
 ];

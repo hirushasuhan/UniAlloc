@@ -1,6 +1,7 @@
 'use client'
 import { useState, FormEvent } from 'react'
 import { api } from '@/lib/api'
+import { getUser, saveAuth } from '@/lib/auth'
 import { HiOutlineXMark } from 'react-icons/hi2'
 
 interface Props {
@@ -31,11 +32,17 @@ export default function ChangePasswordModal({ onClose }: Props) {
     }
 
     try {
-      await api.post('/users/me/change-password', {
+      const { data } = await api.post('/users/me/change-password', {
         current_password: form.current_password,
         new_password: form.new_password
       })
-      setSuccess('Password changed successfully.')
+      // Changing the password revokes every existing token, including this
+      // one, so swap in the freshly issued token the API hands back —
+      // otherwise the next request would 401 and sign the user out.
+      const freshToken = data?.data?.token
+      const user = getUser()
+      if (freshToken && user) saveAuth(freshToken, user)
+      setSuccess('Password changed successfully. Other devices have been signed out.')
       setForm({ current_password: '', new_password: '', confirm_password: '' })
       setTimeout(() => onClose(), 1500)
     } catch(e: any) {
