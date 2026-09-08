@@ -30,9 +30,21 @@ class Db
                     PDO::ATTR_EMULATE_PREPARES   => false,
                 ]);
             } catch (PDOException $e) {
+                // The raw PDO message names the host, database and user, so it
+                // is only surfaced when APP_DEBUG is explicitly on.
+                $app   = require __DIR__ . '/../../config/app.php';
+                $debug = !empty($app['debug']);
+
+                error_log('[UniAlloc] DB connection failed: ' . $e->getMessage());
+
                 http_response_code(500);
                 header('Content-Type: application/json');
-                echo json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]);
+                echo json_encode([
+                    'success' => false,
+                    'message' => $debug
+                        ? 'Database connection failed: ' . $e->getMessage()
+                        : 'Database connection failed. Please contact the administrator.',
+                ]);
                 exit;
             }
         }

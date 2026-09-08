@@ -3,6 +3,8 @@ namespace App\Controllers;
 
 use App\Dao\UserDao;
 use App\Dao\AuditLogDao;
+use App\Helpers\JwtHelper;
+use App\Helpers\PasswordPolicy;
 use App\Helpers\Response;
 use App\Middleware\JwtMiddleware;
 
@@ -65,6 +67,20 @@ class UserController
             if (empty($body[$req])) Response::error("Field '$req' is required", 422);
         }
 
+<<<<<<< Updated upstream
+=======
+        if (!empty($body['title']) && !in_array($body['title'], UserDao::TITLES, true)) {
+            Response::error('Invalid title value', 422);
+        }
+        if (!empty($body['position']) && !in_array($body['position'], UserDao::POSITIONS, true)) {
+            Response::error('Invalid position value', 422);
+        }
+        if (!filter_var($body['email'], FILTER_VALIDATE_EMAIL)) {
+            Response::error('Invalid email address', 422);
+        }
+        PasswordPolicy::enforce((string)$body['password']);
+
+>>>>>>> Stashed changes
         $targetRoleId = (int)$body['role_id'];
 
         if ($auth['role'] === 'department_head') {
@@ -99,12 +115,57 @@ class UserController
         $id   = (int)($params['id'] ?? 0);
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
+        $isAdmin = $auth['role'] === 'system_admin';
+        $isSelf  = (int)$auth['sub'] === $id;
+
         // Only admin can update anyone; others can only update themselves
-        if ($auth['role'] !== 'system_admin' && $auth['sub'] !== $id) {
+        if (!$isAdmin && !$isSelf) {
             Response::error('Forbidden', 403);
         }
 
+<<<<<<< Updated upstream
         $ok = UserDao::update($id, $body);
+=======
+        // STRICT ALLOWLIST. The request body used to be forwarded to the DAO
+        // wholesale, which let any user set their own `password` (bypassing the
+        // current-password check in changePassword), re-enable their own
+        // deactivated account via `is_active`, move themselves between
+        // departments, or rewrite `capacity_hours` to dodge workload
+        // allocation. Anything not named here is dropped.
+        $selfEditable = ['full_name', 'title', 'position', 'email', 'contact', 'operational_status'];
+        $adminOnly    = ['department_id', 'capacity_hours', 'is_active'];
+        $allowed      = $isAdmin ? array_merge($selfEditable, $adminOnly) : $selfEditable;
+
+        $data = array_intersect_key($body, array_flip($allowed));
+
+        if (empty($data)) {
+            Response::error('No updatable fields supplied', 422);
+        }
+
+        if (array_key_exists('title', $data) && !empty($data['title']) && !in_array($data['title'], UserDao::TITLES, true)) {
+            Response::error('Invalid title value', 422);
+        }
+        if (array_key_exists('position', $data) && !empty($data['position']) && !in_array($data['position'], UserDao::POSITIONS, true)) {
+            Response::error('Invalid position value', 422);
+        }
+        if (array_key_exists('operational_status', $data) && !empty($data['operational_status']) && !in_array($data['operational_status'], UserDao::OPERATIONAL_STATUSES, true)) {
+            Response::error('Invalid operational status value', 422);
+        }
+        if (array_key_exists('email', $data)) {
+            if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+                Response::error('Invalid email address', 422);
+            }
+            if (UserDao::emailTakenByOther((string)$data['email'], $id)) {
+                Response::error('That email address is already in use', 409);
+            }
+        }
+        // An admin locking themselves out is almost always a mistake.
+        if ($isSelf && array_key_exists('is_active', $data) && !$data['is_active']) {
+            Response::error('You cannot deactivate your own account.', 422);
+        }
+
+        $ok = UserDao::update($id, $data);
+>>>>>>> Stashed changes
         AuditLogDao::log($auth['sub'], 'update_user', 'users', $id);
         Response::success(['updated' => $ok]);
     }
@@ -124,11 +185,24 @@ class UserController
         $id   = (int)($params['id'] ?? 0);
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         
-        $defaultPass = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 8);
-        $newPassword = !empty($body['password']) ? $body['password'] : $defaultPass;
-        
+        if (!empty($body['password'])) {
+            PasswordPolicy::enforce((string)$body['password']);
+            $newPassword = (string)$body['password'];
+        } else {
+            $newPassword = PasswordPolicy::generateTemporary();
+        }
+
         $ok = UserDao::update($id, ['password' => $newPassword]);
         if ($ok) {
+<<<<<<< Updated upstream
+=======
+            // Force re-enrollment: an admin-issued password means the old
+            // authenticator secret can no longer be trusted as still
+            // belonging to whoever logs in with it next.
+            UserDao::disableTotp($id);
+            // Kill any session the previous password still had open.
+            UserDao::bumpTokenVersion($id);
+>>>>>>> Stashed changes
             AuditLogDao::log($auth['sub'], 'reset_password', 'users', $id);
             Response::success([
                 'message' => 'Password reset successfully',
@@ -148,17 +222,39 @@ class UserController
             Response::error('Current and new passwords are required', 400);
         }
         
+        PasswordPolicy::enforce((string)$body['new_password']);
+
         $user = UserDao::findWithPassword($auth['sub']);
         if (!$user || !password_verify($body['current_password'], $user['password_hash'])) {
             Response::error('Incorrect current password', 401);
         }
-        
+
         $ok = UserDao::update($auth['sub'], ['password' => $body['new_password']]);
-        if ($ok) {
-            AuditLogDao::log($auth['sub'], 'change_password', 'users', $auth['sub']);
-            Response::success(['message' => 'Password changed successfully']);
-        } else {
+        if (!$ok) {
             Response::error('Failed to change password.', 500);
         }
+
+        // Revoke every token minted under the old password, then immediately
+        // re-issue one for THIS session so the user isn't logged out of the
+        // device they just changed the password on. Other devices are dropped.
+        UserDao::bumpTokenVersion((int)$auth['sub']);
+        $state = UserDao::findSecurityState((int)$auth['sub']);
+
+        $token = JwtHelper::generate([
+            'sub'          => (int)$auth['sub'],
+            'name'         => $auth['name']         ?? '',
+            'email'        => $auth['email']        ?? '',
+            'role'         => $state['role_name'],
+            'dept'         => $state['department_id'] !== null ? (int)$state['department_id'] : null,
+            'faculty'      => $state['faculty_id']    !== null ? (int)$state['faculty_id']    : null,
+            'faculty_name' => $auth['faculty_name'] ?? null,
+            'tv'           => (int)$state['token_version'],
+        ]);
+
+        AuditLogDao::log($auth['sub'], 'change_password', 'users', $auth['sub']);
+        Response::success([
+            'message' => 'Password changed successfully. Other devices have been signed out.',
+            'token'   => $token,
+        ]);
     }
 }

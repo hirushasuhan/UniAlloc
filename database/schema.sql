@@ -51,6 +51,14 @@ CREATE TABLE IF NOT EXISTS `users` (
   `full_name`         VARCHAR(200) NOT NULL,
   `email`             VARCHAR(200) NOT NULL UNIQUE,
   `password_hash`     VARCHAR(255) NOT NULL,
+<<<<<<< Updated upstream
+=======
+  `totp_secret`       VARCHAR(64)  NULL DEFAULT NULL COMMENT 'Base32 TOTP secret (RFC 6238), used only for self-service password recovery, never for login',
+  `totp_enabled`      TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1 once the user has verified their authenticator app; gates the forced setup wizard',
+  `totp_failed_attempts` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Consecutive wrong codes on the public forgot-password endpoint',
+  `totp_locked_until` DATETIME    NULL DEFAULT NULL COMMENT 'Self-service recovery is blocked until this time after too many wrong codes',
+  `token_version`     INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Bumped to revoke all outstanding JWTs for this user',
+>>>>>>> Stashed changes
   `role_id`           TINYINT UNSIGNED NOT NULL,
   `department_id`     INT UNSIGNED NULL DEFAULT NULL,
   `enrollment_number` VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Students only',
@@ -267,6 +275,23 @@ CREATE TABLE IF NOT EXISTS `role_promotions` (
   CONSTRAINT `fk_promo_new_role`    FOREIGN KEY (`new_role_id`) REFERENCES `roles` (`id`),
   CONSTRAINT `fk_promo_promoted_by` FOREIGN KEY (`promoted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_promo_approved_by` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------
+-- login_attempts — brute-force throttling for /auth/login and
+-- /auth/register. Counted per account and per source IP; see
+-- App\Dao\LoginAttemptDao. Intentionally has no foreign key, so
+-- attempts against non-existent accounts are still recorded.
+-- -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `login_attempts` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `identifier`   VARCHAR(200) NOT NULL COMMENT 'Lower-cased email that was attempted',
+  `ip_address`   VARCHAR(45)  NOT NULL COMMENT 'IPv4 or IPv6 address of the client',
+  `successful`   TINYINT(1)   NOT NULL DEFAULT 0,
+  `attempted_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_login_attempts_identifier` (`identifier`, `attempted_at`),
+  KEY `idx_login_attempts_ip`         (`ip_address`, `attempted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

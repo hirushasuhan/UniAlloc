@@ -285,36 +285,42 @@ Open [http://localhost:8080/unialloc/api/health](http://localhost:8080/unialloc/
 cd backend-php
 ```
 
-#### B.2 Configure the database connection
+#### B.2 Configure secrets and the database connection
 
-Open `config/database.php` and set your MySQL credentials:
+All backend secrets live in `backend-php/.env`, which is **gitignored** —
+`config/app.php` and `config/database.php` only read from it and contain no
+credentials of their own. Start from the template:
 
-```php
-<?php
-return [
-    'host'     => '127.0.0.1',
-    'port'     => 3306,
-    'dbname'   => 'uniAlloc_db',
-    'username' => 'root',
-    'password' => '',
-    'charset'  => 'utf8mb4',
-];
+```bash
+cp .env.example .env
 ```
 
-Open `config/app.php` and set application settings:
+Generate the two required keys (run each and paste the output into `.env`):
 
-```php
-<?php
-return [
-    'app_name'                => 'UniAlloc',
-    'app_url'                 => 'http://localhost:8000',
-    'debug'                   => true,
-    'jwt_secret'              => 'your-256-bit-secret-key-change-this-in-production',
-    'jwt_ttl'                 => 1440,   // minutes (24 hours)
-    'cors_origins'            => ['http://localhost:3000'],
-    'overload_threshold_pct'  => 90,     // % of capacity_hours that triggers overload alert
-];
+```bash
+php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"   # JWT_SECRET
+php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"   # APP_KEY
 ```
+
+Then fill in the rest:
+
+```ini
+APP_DEBUG=false                # true only on your own machine
+JWT_SECRET=<64 hex characters> # required; the app refuses to start without it
+JWT_TTL=480                    # access token lifetime in minutes (8 hours)
+APP_KEY=<64 hex characters>    # required; encrypts TOTP secrets at rest
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=uniAlloc_db
+DB_USER=root
+DB_PASSWORD=
+CORS_ORIGINS=http://localhost:3000
+REGISTRATION_EMAIL_DOMAIN=     # e.g. university.edu to restrict student sign-ups
+```
+
+> **Never commit `.env`.** Each machine and each deployment gets its own
+> `JWT_SECRET` and `APP_KEY`. Changing `APP_KEY` invalidates every enrolled
+> authenticator app; changing `JWT_SECRET` signs everyone out.
 
 #### B.3 Import the database schema and seed data
 
@@ -345,8 +351,10 @@ Verify the backend is running by opening [http://localhost:8000/api/health](http
 | File | Purpose |
 |---|---|
 | `public/index.php` | Entry point — custom router that maps URLs to controller methods |
-| `config/database.php` | PDO connection configuration |
-| `config/app.php` | App settings (JWT, CORS, overload threshold) |
+| `.env` | **All secrets** (JWT key, app key, DB credentials). Gitignored — never commit |
+| `.env.example` | Committed template showing which variables are required |
+| `config/database.php` | Reads DB settings from `.env` (no credentials of its own) |
+| `config/app.php` | Reads app settings from `.env` (no secrets of its own) |
 | `src/controllers/AuthController.php` | Handles login with manual JWT generation and role claims |
 | `src/middleware/JwtMiddleware.php` | Validates JWT token and role on every protected request |
 | `src/dao/UserDAO.php` | Raw PDO queries for user CRUD (prepared statements) |
@@ -483,7 +491,19 @@ After running the database seed script, the following test accounts are availabl
 | **Lecturer** | `lecturer2@university.edu` | `Lecturer@123` | Assigned to Software Engineering department |
 | **Student** | `student@university.edu` | `Student@123` | Can submit supervisor requests to the Faculty of Computing Dean |
 
-> **Important:** Change all default passwords immediately in a production or shared environment.
+> ### ⚠️ These are LOCAL DEVELOPMENT credentials only
+>
+> These passwords are published in this repository, so **every account above must
+> be considered public**. Never load `seed.sql` into a deployment that holds real
+> staff or student data.
+>
+> Before any shared or production deployment:
+> 1. Load `schema.sql` **without** `seed.sql`, and create the first admin manually.
+> 2. If seed data was ever loaded, change every password above immediately —
+>    a password reset also bumps `token_version`, which signs out any session
+>    that was already using the old credentials.
+> 3. Set a unique `JWT_SECRET` and `APP_KEY` in `backend-php/.env`
+>    (see `backend-php/.env.example`) — never reuse the values from another machine.
 
 ### Testing Cross-Boundary Workflows
 
@@ -514,18 +534,22 @@ Use these accounts together to verify the key workflows:
 | `jwt.expiration` | Token expiry in milliseconds | `86400000` (24h) |
 | `overload.threshold.percent` | Capacity % at which overload alert fires | `90` |
 
-### Backend (PHP — `config/database.php` and `config/app.php`)
+### Backend (PHP — `backend-php/.env`, gitignored)
 
 | Variable | Description | Default |
 |---|---|---|
-| `host` | Database host | `127.0.0.1` |
-| `port` | Database port | `3306` |
-| `dbname` | Database name | `uniAlloc_db` |
-| `username` | MySQL username | `root` |
-| `password` | MySQL password | *(set in config)* |
-| `jwt_secret` | Secret key for JWT signing | *(must be set — use a 256-bit random string)* |
-| `jwt_ttl` | Token expiry in minutes | `1440` (24h) |
-| `overload_threshold_pct` | Capacity % at which overload alert fires | `90` |
+| `DB_HOST` | Database host | `127.0.0.1` |
+| `DB_PORT` | Database port | `3306` |
+| `DB_NAME` | Database name | `uniAlloc_db` |
+| `DB_USER` | MySQL username | `root` |
+| `DB_PASSWORD` | MySQL password | *(empty)* |
+| `JWT_SECRET` | Signing key for JWTs — **required**, 64 hex chars | *(none; app refuses to start)* |
+| `JWT_TTL` | Token expiry in minutes | `480` (8h) |
+| `APP_KEY` | AES-256-GCM key encrypting TOTP secrets — **required** | *(none; app refuses to start)* |
+| `APP_DEBUG` | Return raw exception messages in API errors | `false` |
+| `CORS_ORIGINS` | Comma-separated allowed browser origins | `http://localhost:3000` |
+| `REGISTRATION_EMAIL_DOMAIN` | Restrict student self-registration to one domain | *(blank = any)* |
+| `OVERLOAD_THRESHOLD_PCT` | Capacity % at which overload alert fires | `90` |
 
 ### Frontend (`frontend/.env.local`)
 
