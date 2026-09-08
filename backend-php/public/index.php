@@ -18,8 +18,40 @@ spl_autoload_register(function (string $class): void {
     if (file_exists($file)) require $file;
 });
 
-// --- CORS ---
+// --- Error handling ---------------------------------------------------
+// Uncaught exceptions used to reach the client as a raw PHP stack trace,
+// which exposes absolute filesystem paths and internal structure. Log the
+// detail server-side and return clean JSON instead.
 $cfg = require BASE_PATH . '/config/app.php';
+
+ini_set('display_errors', !empty($cfg['debug']) ? '1' : '0');
+error_reporting(E_ALL);
+
+set_exception_handler(function (\Throwable $e) use ($cfg) {
+    error_log(sprintf(
+        '[UniAlloc] Uncaught %s: %s in %s:%d',
+        get_class($e), $e->getMessage(), $e->getFile(), $e->getLine()
+    ));
+
+    // The most common setup mistake deserves an actionable message rather
+    // than a generic one, in every mode.
+    if ($e instanceof \PDOException && str_contains($e->getMessage(), "doesn't exist")) {
+        $message = 'Database schema is out of date — a required table or column is missing. '
+                 . 'Run: mysql -u root <your_db_name> < database/apply_pending_migrations.sql';
+    } elseif (!empty($cfg['debug'])) {
+        $message = get_class($e) . ': ' . $e->getMessage();
+    } else {
+        $message = 'An unexpected server error occurred. Please contact the administrator.';
+    }
+
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+    }
+    echo json_encode(['success' => false, 'message' => $message]);
+});
+
+// --- CORS ---
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, $cfg['cors_origins'], true)) {
     header("Access-Control-Allow-Origin: $origin");
