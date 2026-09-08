@@ -51,6 +51,9 @@ class Crypto
 
         $raw = base64_decode(substr($value, strlen(self::PREFIX)), true);
         if ($raw === false || strlen($raw) <= self::IV_BYTES + self::TAG_BYTES) {
+            // Most likely the stored value was truncated by a column that is
+            // too narrow (encrypted values run ~87 chars), or APP_KEY changed.
+            error_log('[UniAlloc] Crypto::decrypt — stored value is malformed or truncated (length ' . strlen($value) . ')');
             return null;
         }
 
@@ -59,7 +62,11 @@ class Crypto
         $ciphertext = substr($raw, self::IV_BYTES + self::TAG_BYTES);
 
         $plaintext = openssl_decrypt($ciphertext, self::CIPHER, self::key(), OPENSSL_RAW_DATA, $iv, $tag);
-        return $plaintext === false ? null : $plaintext;
+        if ($plaintext === false) {
+            error_log('[UniAlloc] Crypto::decrypt — authentication failed; APP_KEY may have changed since this value was written');
+            return null;
+        }
+        return $plaintext;
     }
 
     private static function key(): string

@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `position`          VARCHAR(50)  NULL DEFAULT NULL COMMENT 'Academic rank / job position (full allowed list in UserDao::POSITIONS), e.g. Senior/Associate Professor, Senior Lecturer (Grade I/II), Lecturer (Grade I/II), Probationary/Assistant/Temporary/Visiting Lecturer, Instructor, Demonstrator, Research Assistant. Independent of title (a person can be Dr. AND a Senior Lecturer).',
   `email`             VARCHAR(200) NOT NULL UNIQUE,
   `password_hash`     VARCHAR(255) NOT NULL,
-  `totp_secret`       VARCHAR(64)  NULL DEFAULT NULL COMMENT 'Base32 TOTP secret (RFC 6238), used only for self-service password recovery, never for login',
+  `totp_secret`       VARCHAR(255) NULL DEFAULT NULL COMMENT 'AES-256-GCM encrypted TOTP secret (RFC 6238), ~87 chars once encrypted; recovery only, never login',
   `totp_enabled`      TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1 once the user has verified their authenticator app; gates the forced setup wizard',
   `totp_failed_attempts` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Consecutive wrong codes on the public forgot-password endpoint',
   `totp_locked_until` DATETIME    NULL DEFAULT NULL COMMENT 'Self-service recovery is blocked until this time after too many wrong codes',

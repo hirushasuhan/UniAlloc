@@ -24,8 +24,8 @@
 USE `uniAlloc_db`;
 
 ALTER TABLE `users`
-  ADD COLUMN `totp_secret` VARCHAR(64) NULL DEFAULT NULL
-    COMMENT 'Base32 TOTP secret (RFC 6238), used only for self-service password recovery, never for login'
+  ADD COLUMN `totp_secret` VARCHAR(255) NULL DEFAULT NULL
+    COMMENT 'AES-256-GCM encrypted TOTP secret (RFC 6238), ~87 chars once encrypted; recovery only, never login'
     AFTER `password_hash`,
   ADD COLUMN `totp_enabled` TINYINT(1) NOT NULL DEFAULT 0
     COMMENT '1 once the user has verified their authenticator app; gates the forced setup wizard'

@@ -58,10 +58,34 @@ CREATE TABLE IF NOT EXISTS `login_attempts` (
   KEY `idx_login_attempts_ip`         (`ip_address`, `attempted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---- fix: widen totp_secret for encrypted values ----
+-- The column was originally sized for the 32-character plaintext base32
+-- secret. Encrypting it at rest (AES-256-GCM, base64, 'enc:v1:' prefix)
+-- produces ~87 characters, so MySQL silently truncated it and the secret
+-- could no longer be decrypted -- enrollment failed with "No authenticator
+-- setup in progress". Widen the column, then clear any value that was
+-- already truncated so those users simply enroll again.
+
+SET @ddl := IF((SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'totp_secret') >= 255,
+  'SELECT ''users.totp_secret already wide enough -- skipped''',
+  'ALTER TABLE `users` MODIFY COLUMN `totp_secret` VARCHAR(255) NULL DEFAULT NULL COMMENT ''AES-256-GCM encrypted TOTP secret (RFC 6238), ~87 chars once encrypted; recovery only, never login''');
+PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- Only targets truncated ciphertext: encrypted values are ~87 chars, so a
+-- value that is exactly 64 is one MySQL cut off. Plaintext legacy secrets
+-- (32 chars, no prefix) and valid encrypted ones are left untouched.
+UPDATE `users`
+   SET `totp_secret` = NULL, `totp_enabled` = 0
+ WHERE `totp_secret` LIKE 'enc:v1:%'
+   AND CHAR_LENGTH(`totp_secret`) = 64;
+
 -- ---- confirm the result ----
 SELECT
   (SELECT COUNT(*) FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
       AND COLUMN_NAME IN ('totp_secret','totp_enabled','totp_failed_attempts','totp_locked_until','token_version')) AS user_columns_added_of_5,
   (SELECT COUNT(*) FROM information_schema.TABLES
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_attempts') AS login_attempts_table;
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_attempts') AS login_attempts_table,
+  (SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'totp_secret') AS totp_secret_size;
