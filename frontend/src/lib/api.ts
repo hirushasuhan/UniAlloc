@@ -13,6 +13,11 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Returned when the interceptor has already handled a failure by navigating
+// away. A promise that never settles stops the pending call from becoming an
+// unhandled rejection in the moments before the new page loads.
+const NEVER_SETTLES: Promise<never> = new Promise(() => {})
+
 // Global auth failure handling.
 //   401 → token invalid, expired, or revoked server-side (password changed,
 //         account deactivated). Purge local state and bounce to the right page.
@@ -34,7 +39,14 @@ api.interceptors.response.use(
       if (status === 403 && err.response?.data?.errors?.code === 'TOTP_SETUP_REQUIRED') {
         if (!window.location.pathname.startsWith('/security-setup')) {
           window.location.replace('/security-setup')
+          // Deliberately never settles. Dashboard pages fire their requests
+          // from their own useEffect, which runs before the layout guard can
+          // redirect, so one page load can produce several of these. Rejecting
+          // would surface an unhandled AxiosError from each of them while the
+          // browser is already navigating away.
+          return NEVER_SETTLES
         }
+        // Already on the setup page — let the caller show the error itself.
         return Promise.reject(err)
       }
 
@@ -48,6 +60,7 @@ api.interceptors.response.use(
           purgeAllClientData()
           window.location.replace(expired ? '/login' : '/no-access')
         })
+        return NEVER_SETTLES
       }
     }
 
