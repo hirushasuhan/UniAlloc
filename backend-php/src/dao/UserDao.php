@@ -42,7 +42,7 @@ class UserDao
                        u.department_id, d.dept_name,
                        COALESCE(d.faculty_id, f_dean.id) AS faculty_id,
                        COALESCE(f.faculty_name, f_dean.faculty_name) AS faculty_name,
-                       u.capacity_hours, u.operational_status, u.contact, u.enrollment_number, u.is_active, u.created_at
+                       u.capacity_hours, u.operational_status, u.contact, u.enrollment_number, u.is_active, u.totp_enabled, u.created_at
                 FROM users u
                 JOIN roles r ON r.id = u.role_id
                 LEFT JOIN departments d ON d.id = u.department_id
@@ -64,7 +64,7 @@ class UserDao
                     u.department_id, d.dept_name,
                     COALESCE(d.faculty_id, f_dean.id) AS faculty_id,
                     COALESCE(f.faculty_name, f_dean.faculty_name) AS faculty_name,
-                    u.capacity_hours, u.operational_status, u.contact, u.enrollment_number, u.is_active, u.created_at
+                    u.capacity_hours, u.operational_status, u.contact, u.enrollment_number, u.is_active, u.totp_enabled, u.created_at
              FROM users u
              JOIN roles r ON r.id = u.role_id
              LEFT JOIN departments d ON d.id = u.department_id
@@ -262,5 +262,86 @@ class UserDao
         $stmt->execute([':name' => $name]);
         $row = $stmt->fetch();
         return $row ? (int)$row['id'] : null;
+    }
+
+    // ------------------------------------------------------------
+    // TOTP self-service password recovery
+    // ------------------------------------------------------------
+
+    /** Auth-only lookup for the TOTP setup/verify endpoints (already-logged-in user). */
+    public static function findAuthById(int $id): ?array
+    {
+        $stmt = Db::connection()->prepare('SELECT id, email, totp_secret, totp_enabled FROM users WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    /** Public lookup by email for the (unauthenticated) forgot-password flow. */
+    public static function findByEmailForRecovery(string $email): ?array
+    {
+        $stmt = Db::connection()->prepare(
+            'SELECT id, email, is_active, totp_secret, totp_enabled, totp_failed_attempts, totp_locked_until
+             FROM users WHERE email = :email LIMIT 1'
+        );
+        $stmt->execute([':email' => $email]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    /** Stores a freshly generated (unconfirmed) secret — not active until verified. */
+    public static function saveTotpSecret(int $id, string $secret): void
+    {
+        Db::connection()->prepare(
+            'UPDATE users SET totp_secret = :secret, totp_enabled = 0, totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = :id'
+        )->execute([':secret' => $secret, ':id' => $id]);
+    }
+
+    /** Confirms enrollment once the user has proven they hold the secret. */
+    public static function enableTotp(int $id): void
+    {
+        Db::connection()->prepare(
+            'UPDATE users SET totp_enabled = 1, totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = :id'
+        )->execute([':id' => $id]);
+    }
+
+    /**
+     * Wipes TOTP enrollment entirely. Used when an admin resets a user's
+     * password (lost-phone fallback) — the old secret can no longer be
+     * trusted, so the user is routed back through the enrollment wizard.
+     */
+    public static function disableTotp(int $id): void
+    {
+        Db::connection()->prepare(
+            'UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = :id'
+        )->execute([':id' => $id]);
+    }
+
+    /** Records a wrong code on the public reset endpoint; locks out after too many. */
+    public static function registerTotpFailure(int $id, int $maxAttempts = 5, int $lockMinutes = 15): void
+    {
+        $db = Db::connection();
+        $db->prepare('UPDATE users SET totp_failed_attempts = totp_failed_attempts + 1 WHERE id = :id')
+           ->execute([':id' => $id]);
+
+        $stmt = $db->prepare('SELECT totp_failed_attempts FROM users WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        $attempts = (int)($stmt->fetch()['totp_failed_attempts'] ?? 0);
+
+        if ($attempts >= $maxAttempts) {
+            // $lockMinutes is a trusted internal int (not user input), so it's safe to
+            // inline directly — MySQL's INTERVAL clause is picky about bound params
+            // when PDO::ATTR_EMULATE_PREPARES is off, as configured in Db::connection().
+            $mins = (int)$lockMinutes;
+            $db->prepare("UPDATE users SET totp_locked_until = DATE_ADD(NOW(), INTERVAL $mins MINUTE), totp_failed_attempts = 0 WHERE id = :id")
+               ->execute([':id' => $id]);
+        }
+    }
+
+    public static function clearTotpFailures(int $id): void
+    {
+        Db::connection()->prepare(
+            'UPDATE users SET totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = :id'
+        )->execute([':id' => $id]);
     }
 }

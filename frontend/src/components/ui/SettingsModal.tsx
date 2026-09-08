@@ -3,7 +3,7 @@ import { useState, FormEvent } from 'react'
 import { api } from '@/lib/api'
 import { AuthUser, saveAuth, getToken, clearAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import { HiOutlineXMark, HiOutlineKey, HiOutlineArrowRightOnRectangle } from 'react-icons/hi2'
+import { HiOutlineXMark, HiOutlineKey, HiOutlineArrowRightOnRectangle, HiOutlineDevicePhoneMobile } from 'react-icons/hi2'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 
 const TITLES = ['Prof', 'Dr', 'Mr', 'Mrs', 'Ms', 'Miss', 'Rev', 'Thero']
@@ -213,6 +213,25 @@ export default function SettingsModal({ user, onClose, onChangePasswordClick, on
                 <div className="text-left">
                   <p className="font-medium text-sm transition-colors">Change Password</p>
                   <p className="text-xs text-[var(--muted)]">Update your account password</p>
+                </div>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => { onClose(); router.push('/security-setup?reenroll=1') }}
+              className="w-full flex items-center justify-between p-4 mt-3 rounded-xl bg-[var(--bg)] border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] group-hover:border-[var(--accent)]">
+                  <HiOutlineDevicePhoneMobile size={16} />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-sm transition-colors">
+                    Authenticator App {user.totp_enabled ? '' : '— Not Set Up'}
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {user.totp_enabled ? 'Replace it if you got a new phone' : 'Needed to reset your password without an admin'}
+                  </p>
                 </div>
               </div>
             </button>

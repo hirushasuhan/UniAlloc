@@ -122,10 +122,10 @@ export default function AdminUsersPage() {
   }
 
   async function resetPassword(id: number) {
-    if (!confirm('Are you sure you want to reset this user\'s password?')) return;
+    if (!confirm('Are you sure you want to reset this user\'s password? They will also need to re-enroll their authenticator app on next login.')) return;
     try {
       const res = await api.post(`/users/${id}/reset-password`, {})
-      alert(`Success! The new password for this user is: ${res.data.data.new_password}`)
+      alert(`Success! The new password for this user is: ${res.data.data.new_password}\n\nThey will be asked to set up their authenticator app again the next time they log in.`)
     } catch(err:any) {
       alert(err.response?.data?.message ?? 'Failed to reset password.')
     }
@@ -237,9 +237,14 @@ export default function AdminUsersPage() {
                 <td className="py-3 px-4 text-[var(--muted)] whitespace-nowrap">{u.dept_name ?? '—'}</td>
                 <td className="py-3 px-4 text-[var(--muted)] whitespace-nowrap">{u.capacity_hours}h</td>
                 <td className="py-3 px-4">
-                  <span className={`badge whitespace-nowrap ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {u.is_active ? 'Active' : 'Inactive'}
-                  </span>
+                  <div className="flex flex-col gap-1 items-start">
+                    <span className={`badge whitespace-nowrap ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {u.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                    <span className={`badge whitespace-nowrap ${u.totp_enabled ? 'bg-cyan-100 text-cyan-700' : 'bg-amber-100 text-amber-700'}`} title="Self-service password recovery via authenticator app">
+                      {u.totp_enabled ? '2FA Enrolled' : '2FA Not Set'}
+                    </span>
+                  </div>
                 </td>
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-1.5">

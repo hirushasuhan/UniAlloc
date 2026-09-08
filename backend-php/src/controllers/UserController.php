@@ -191,6 +191,10 @@ class UserController
         
         $ok = UserDao::update($id, ['password' => $newPassword]);
         if ($ok) {
+            // Force re-enrollment: an admin-issued password means the old
+            // authenticator secret can no longer be trusted as still
+            // belonging to whoever logs in with it next.
+            UserDao::disableTotp($id);
             AuditLogDao::log($auth['sub'], 'reset_password', 'users', $id);
             Response::success([
                 'message' => 'Password reset successfully',

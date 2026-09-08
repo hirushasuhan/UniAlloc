@@ -10,6 +10,7 @@ export interface AuthUser {
   faculty_id: number | null
   faculty_name?: string | null
   contact?: string | null
+  totp_enabled: boolean
 }
 
 export function getUser(): AuthUser | null {

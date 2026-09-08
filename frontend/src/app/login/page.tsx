@@ -203,7 +203,7 @@ export default function LoginPage() {
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Password</label>
               <button 
                 type="button" 
-                onClick={() => alert('Please contact the System Administrator to reset your password.')} 
+                onClick={() => router.push('/forgot-password')} 
                 className={`text-xs text-${colorClass}-400 hover:text-${colorClass}-300 transition-colors`}
               >
                 Forgot?

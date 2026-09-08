@@ -4,7 +4,10 @@ namespace App\Controllers;
 use App\Helpers\Db;
 use App\Helpers\JwtHelper;
 use App\Helpers\Response;
+use App\Helpers\Totp;
+use App\Middleware\JwtMiddleware;
 use App\Dao\AuditLogDao;
+use App\Dao\UserDao;
 
 class AuthController
 {
@@ -20,7 +23,7 @@ class AuthController
 
         $db   = Db::connection();
         $stmt = $db->prepare(
-            'SELECT u.id, u.full_name, u.title, u.position, u.email, u.password_hash, u.is_active,
+            'SELECT u.id, u.full_name, u.title, u.position, u.email, u.password_hash, u.is_active, u.totp_enabled,
                     u.capacity_hours, u.operational_status, u.department_id, u.enrollment_number,
                     r.role_name,
                     d.faculty_id,
@@ -83,6 +86,7 @@ class AuthController
                 'faculty_name'      => $facultyName,
                 'enrollment_number' => $user['enrollment_number'] ?? null,
                 'contact'           => $user['contact'] ?? null,
+                'totp_enabled'      => (bool)$user['totp_enabled'],
             ],
         ], 'Login successful');
     }
@@ -146,7 +150,7 @@ class AuthController
 
             // Auto-login logic
             $stmt = $db->prepare(
-                'SELECT u.id, u.full_name, u.email, u.department_id, u.enrollment_number,
+                'SELECT u.id, u.full_name, u.email, u.department_id, u.enrollment_number, u.totp_enabled,
                         r.role_name, d.faculty_id, f.faculty_name
                  FROM users u
                  JOIN roles r ON r.id = u.role_id
@@ -187,6 +191,7 @@ class AuthController
                     'faculty_name'      => $facultyName,
                     'enrollment_number' => $user['enrollment_number'] ?? null,
                     'contact'           => null,
+                    'totp_enabled'      => (bool)$user['totp_enabled'],
                 ],
             ], 'Registration successful');
 
@@ -194,5 +199,97 @@ class AuthController
             $db->rollBack();
             Response::error('Failed to register user: ' . $e->getMessage(), 500);
         }
+    }
+
+    // ------------------------------------------------------------
+    // TOTP self-service password recovery
+    // ------------------------------------------------------------
+
+    /** Starts (or restarts) authenticator enrollment for the logged-in user. */
+    public function totpSetup(array $params = []): void
+    {
+        $auth   = JwtMiddleware::handle(); // any authenticated user
+        $secret = Totp::generateSecret();
+        UserDao::saveTotpSecret((int)$auth['sub'], $secret);
+
+        Response::success([
+            'secret'      => $secret,
+            'otpauth_url' => Totp::otpAuthUrl($secret, $auth['email'] ?? ('user' . $auth['sub'])),
+        ]);
+    }
+
+    /** Confirms enrollment: the user proves they scanned/typed the secret correctly. */
+    public function totpVerify(array $params = []): void
+    {
+        $auth = JwtMiddleware::handle();
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $code = trim((string)($body['code'] ?? ''));
+
+        $user = UserDao::findAuthById((int)$auth['sub']);
+        if (!$user || !$user['totp_secret']) {
+            Response::error('No authenticator setup in progress. Please start setup again.', 422);
+        }
+
+        if (!Totp::verify($user['totp_secret'], $code)) {
+            Response::error('Incorrect code. Please check your authenticator app and try again.', 401);
+        }
+
+        UserDao::enableTotp((int)$auth['sub']);
+        AuditLogDao::log((int)$auth['sub'], 'totp_enabled', 'users', (int)$auth['sub']);
+        Response::success(['totp_enabled' => true], 'Authenticator enrolled successfully');
+    }
+
+    /**
+     * Step 1 of the public forgot-password flow: tells the frontend whether
+     * this email can self-recover, WITHOUT ever confirming whether the email
+     * itself exists (an unknown email and a known-but-unenrolled email both
+     * come back as not recoverable).
+     */
+    public function forgotPasswordCheck(array $params = []): void
+    {
+        $body  = json_decode(file_get_contents('php://input'), true) ?? [];
+        $email = trim(strtolower($body['email'] ?? ''));
+
+        if (!$email) {
+            Response::error('Email is required', 422);
+        }
+
+        $user = UserDao::findByEmailForRecovery($email);
+        $recoverable = $user && $user['is_active'] && $user['totp_enabled'];
+
+        Response::success(['recoverable' => (bool)$recoverable]);
+    }
+
+    /** Step 2: verifies the authenticator code and sets the new password directly. */
+    public function forgotPasswordReset(array $params = []): void
+    {
+        $body        = json_decode(file_get_contents('php://input'), true) ?? [];
+        $email       = trim(strtolower($body['email'] ?? ''));
+        $code        = trim((string)($body['code'] ?? ''));
+        $newPassword = (string)($body['new_password'] ?? '');
+
+        if (!$email || !$code || strlen($newPassword) < 8) {
+            Response::error('Email, authenticator code, and a new password (min 8 characters) are required', 422);
+        }
+
+        $user = UserDao::findByEmailForRecovery($email);
+        if (!$user || !$user['is_active'] || !$user['totp_enabled']) {
+            Response::error('Unable to reset your password with the details provided. Please contact your System Administrator for help.', 401);
+        }
+
+        if (!empty($user['totp_locked_until']) && strtotime($user['totp_locked_until']) > time()) {
+            Response::error('Too many incorrect attempts. Please wait before trying again, or contact your System Administrator.', 429);
+        }
+
+        if (!Totp::verify($user['totp_secret'], $code)) {
+            UserDao::registerTotpFailure((int)$user['id']);
+            Response::error('Unable to reset your password with the details provided. Please contact your System Administrator for help.', 401);
+        }
+
+        UserDao::clearTotpFailures((int)$user['id']);
+        UserDao::update((int)$user['id'], ['password' => $newPassword]);
+        AuditLogDao::log((int)$user['id'], 'self_reset_password', 'users', (int)$user['id']);
+
+        Response::success(['message' => 'Password reset successfully'], 'Password reset successfully');
     }
 }

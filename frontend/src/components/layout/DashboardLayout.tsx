@@ -26,6 +26,11 @@ export default function DashboardLayout({ children, requiredRole }: {
       const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole]
       if (!allowed.includes(u.role)) { router.replace('/no-access'); return }
     }
+
+    // No self-service password recovery enrolled yet → finish that first,
+    // before anything else in the dashboard is reachable.
+    if (!u.totp_enabled) { router.replace('/security-setup'); return }
+
     setUser(u)
   }, [])
 

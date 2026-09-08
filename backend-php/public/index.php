@@ -50,6 +50,10 @@ $routes = [
     'POST /auth/login'                     => ['AuthController', 'login'],
     'POST /auth/register'                  => ['AuthController', 'register'],
     'POST /auth/logout'                    => ['AuthController', 'logout'],
+    'POST /auth/totp/setup'                => ['AuthController', 'totpSetup'],
+    'POST /auth/totp/verify'                => ['AuthController', 'totpVerify'],
+    'POST /auth/forgot-password/check'     => ['AuthController', 'forgotPasswordCheck'],
+    'POST /auth/forgot-password/reset'     => ['AuthController', 'forgotPasswordReset'],
 
     // Users
     'GET /users'                           => ['UserController', 'index'],
